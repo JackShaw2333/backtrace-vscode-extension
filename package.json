@@ -1,0 +1,80 @@
+{
+  "name": "backtrace",
+  "displayName": "Backtrace",
+  "description": "Tree-based navigation history for VSCode — backtrack your exploration trail",
+  "version": "0.0.1",
+  "license": "MIT",
+  "engines": { "vscode": "^1.78.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "backtrace.goBack", "title": "Backtrace: Go Back" },
+      { "command": "backtrace.goForward", "title": "Backtrace: Go Forward" }
+    ],
+    "keybindings": [
+      { "command": "backtrace.goBack", "key": "ctrl+alt+[", "when": "editorTextFocus" },
+      { "command": "backtrace.goForward", "key": "ctrl+alt+]", "when": "editorTextFocus" }
+    ],
+    "configuration": {
+      "title": "Backtrace",
+      "properties": {
+        "backtrace.trackedCommands": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["editor.action.revealDefinition"],
+          "description": "List of command IDs to track for navigation history"
+        },
+        "backtrace.maxTreeDepth": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "description": "Maximum depth of the navigation tree"
+        },
+        "backtrace.persistHistory": {
+          "type": "boolean",
+          "default": true,
+          "description": "Persist navigation tree across VSCode sessions"
+        }
+      }
+    },
+    "views": {
+      "explorer": [
+        { "id": "backtraceTree", "name": "Backtrace Tree" }
+      ],
+      "backtrace": [
+        { "id": "backtraceStack", "name": "Backtrace Stack", "type": "webview" }
+      ]
+    },
+    "viewsContainers": {
+      "panel": [
+        { "id": "backtrace", "title": "Backtrace", "icon": "$(list-tree)" }
+      ]
+    },
+    "viewsWelcome": {
+      "backtraceTree": [
+        { "when": "backtrace.isEmpty", "contents": "No navigation history yet.\nNavigate with F12/Ctrl+Click to start tracking." }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.78.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "mocha": "^10.2.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
