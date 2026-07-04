@@ -41,11 +41,11 @@ export class NavTree {
         return this.currentNode;
     }
 
-    /** Get the list of forward navigation options (siblings from parent context) */
+    /** Get the list of forward navigation options (siblings from parent context, excluding current node) */
     getForwardOptions(): NavNode[] {
         if (!this.currentNode) return [];
         if (this.currentNode.parent) {
-            return this.currentNode.parent.children;
+            return this.currentNode.parent.children.filter(c => c !== this.currentNode);
         }
         return this.currentNode.children;
     }

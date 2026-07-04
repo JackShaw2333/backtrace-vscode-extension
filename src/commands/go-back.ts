@@ -24,5 +24,7 @@ export function navigateToNode(node: { uri: string; line: number; column: number
                 node.line - 1, node.column - 1
             ),
         });
+    }, (err) => {
+        vscode.window.showErrorMessage(`Backtrace: Could not open ${uri.toString()}`);
     });
 }

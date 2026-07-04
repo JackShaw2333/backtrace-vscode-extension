@@ -4,8 +4,9 @@
   "description": "Tree-based navigation history for VSCode — backtrack your exploration trail",
   "version": "0.0.1",
   "license": "MIT",
-  "engines": { "vscode": "^1.78.0" },
+  "engines": { "vscode": "^1.82.0" },
   "categories": ["Other"],
+  "enabledApiProposals": ["onDidExecuteCommand"],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
@@ -67,7 +68,7 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.78.0",
+    "@types/vscode": "^1.82.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "typescript": "^5.9.3",

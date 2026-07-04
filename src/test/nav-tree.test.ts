@@ -45,16 +45,15 @@ suite('NavTree', () => {
         assert.strictEqual(result, null);
     });
 
-    test('getForwardOptions returns children of currentNode', () => {
+    test('getForwardOptions returns siblings excluding current node', () => {
         const tree = new NavTree(50);
         tree.addJump('a.ts', 1, 1, 'a');
         tree.addJump('b.ts', 2, 1, 'b');
         tree.goBack();
         tree.addJump('c.ts', 3, 1, 'c');
         const options = tree.getForwardOptions();
-        assert.strictEqual(options.length, 2);
+        assert.strictEqual(options.length, 1);
         assert.strictEqual(options[0].symbolName, 'b');
-        assert.strictEqual(options[1].symbolName, 'c');
     });
 
     test('goForward by index navigates to that child', () => {
