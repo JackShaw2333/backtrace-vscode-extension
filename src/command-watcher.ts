@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { NavTree } from './nav-tree';
 import { BacktraceConfig } from './config';
-import { CURSOR_STABILIZE_DELAY_MS, MIN_SAME_FILE_LINE_DELTA } from './constants';
+import { CURSOR_STABILIZE_DELAY_MS } from './constants';
 
 interface PendingCapture {
     fromUri: string;
@@ -83,9 +83,6 @@ export class CommandWatcher {
 
         // Same position — no real jump happened
         if (toUri === fromUri && toLine === fromLine && toColumn === fromColumn) return;
-
-        // Same file, line delta too small — likely noise, not a real jump
-        if (toUri === fromUri && Math.abs(toLine - fromLine) < MIN_SAME_FILE_LINE_DELTA) return;
 
         this.tree.addJump(toUri, toLine, toColumn, symbolName);
 

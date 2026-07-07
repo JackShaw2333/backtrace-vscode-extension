@@ -15,10 +15,6 @@ export const DEFAULT_TRACKED_COMMANDS: readonly string[] = [
     'editor.action.revealDefinition',
 ];
 
-/** Minimum line difference to consider a same-file jump meaningful */
-export const MIN_SAME_FILE_LINE_DELTA = 3;
-
-/** Debounce delay (ms) when waiting for cursor to settle after a command */
 export const CURSOR_STABILIZE_DELAY_MS = 120;
 
 /** Namespace for all backtrace config keys */

@@ -36,17 +36,6 @@ suite('Backtrace Extension', () => {
         assert.strictEqual(fromA[0].symbolName, 'b');
     });
 
-    test('same file jump with small line delta is filtered', () => {
-        // This tests the MIN_SAME_FILE_LINE_DELTA logic indirectly
-        // by verifying addJump accepts the jump
-        const tree = new NavTree(50);
-        tree.addJump('a.ts', 1, 1, 'start');
-        tree.addJump('a.ts', 2, 1, 'small_jump');  // same file, delta=1 (< 3)
-        // The tree should still record it (CommandWatcher filters, NavTree doesn't)
-        assert.strictEqual(tree.currentNode?.symbolName, 'small_jump');
-        assert.strictEqual(tree.root?.children.length, 1);
-    });
-
     test('deep tree maintains correct parent chain', () => {
         const tree = new NavTree(50);
         const nodes = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];

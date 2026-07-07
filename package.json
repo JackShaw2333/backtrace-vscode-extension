@@ -4,27 +4,53 @@
   "description": "Tree-based navigation history for VSCode — backtrack your exploration trail",
   "version": "0.0.1",
   "license": "MIT",
-  "engines": { "vscode": "^1.82.0" },
-  "categories": ["Other"],
-  "enabledApiProposals": ["onDidExecuteCommand"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "enabledApiProposals": [
+    "onDidExecuteCommand"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-      { "command": "backtrace.goBack", "title": "Backtrace: Go Back" },
-      { "command": "backtrace.goForward", "title": "Backtrace: Go Forward" }
+      {
+        "command": "backtrace.goBack",
+        "title": "Backtrace: Go Back"
+      },
+      {
+        "command": "backtrace.goForward",
+        "title": "Backtrace: Go Forward"
+      }
     ],
     "keybindings": [
-      { "command": "backtrace.goBack", "key": "ctrl+alt+[", "when": "editorTextFocus" },
-      { "command": "backtrace.goForward", "key": "ctrl+alt+]", "when": "editorTextFocus" }
+      {
+        "command": "backtrace.goBack",
+        "key": "ctrl+alt+[",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "backtrace.goForward",
+        "key": "ctrl+alt+]",
+        "when": "editorTextFocus"
+      }
     ],
     "configuration": {
       "title": "Backtrace",
       "properties": {
         "backtrace.trackedCommands": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["editor.action.revealDefinition"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "editor.action.revealDefinition"
+          ],
           "description": "List of command IDs to track for navigation history"
         },
         "backtrace.maxTreeDepth": {
@@ -42,22 +68,35 @@
     },
     "views": {
       "explorer": [
-        { "id": "backtraceTree", "name": "Backtrace Tree" }
+        {
+          "id": "backtraceTree",
+          "name": "Backtrace Tree"
+        }
       ],
       "backtrace": [
-        { "id": "backtraceStack", "name": "Backtrace Stack", "type": "webview" }
+        {
+          "id": "backtraceStack",
+          "name": "Backtrace Stack",
+          "type": "webview"
+        }
       ]
     },
     "viewsContainers": {
       "panel": [
-        { "id": "backtrace", "title": "Backtrace", "icon": "$(list-tree)" }
+        {
+          "id": "backtrace",
+          "title": "Backtrace",
+          "icon": "$(list-tree)"
+        }
       ]
     },
-    "viewsWelcome": {
-      "backtraceTree": [
-        { "when": "backtrace.isEmpty", "contents": "No navigation history yet.\nNavigate with F12/Ctrl+Click to start tracking." }
-      ]
-    }
+    "viewsWelcome": [
+      {
+        "view": "backtraceTree",
+        "when": "backtrace.isEmpty",
+        "contents": "No navigation history yet.\nNavigate with F12/Ctrl+Click to start tracking."
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
