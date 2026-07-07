@@ -1,12 +1,11 @@
 /**
- * 侧边栏树视图（Explorer 中的 Backtrace Tree）。
+ * 侧边栏树视图（Explorer 中的 "Backtrace Tree"）。
  *
- * TreeDataProvider 是 VSCode 的标准接口，作用是"把一个数据对象
- * 转成可视化的树节点"。
- * - getTreeItem()：节点 → 显示样式
- * - getChildren()：获取子节点
- * - getParent()：获取父节点
- * - onDidChangeTreeData：通知 VSCode 刷新视觉
+ * 在左侧文件浏览区下方显示导航树的完整结构。
+ * 用户可以点击任意节点跳转到对应位置。
+ *
+ * TreeDataProvider 是 VSCode 的标准接口，有点像"翻译器"：
+ *   把数据（NavNode）翻译成 VSCode 能显示的样子（TreeItem）。
  */
 
 import * as vscode from 'vscode';
@@ -15,47 +14,77 @@ import { NavNode } from '../nav-node';
 import { FILE_COLORS } from '../constants';
 import { navigateToNode } from '../commands/go-back';
 
-/** TreeDataProvider<NavNode> 的泛型 <NavNode> 表示树中每个节点的数据类型 */
 export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
-    // EventEmitter 发射事件，VSCode 收到后刷新树视图
+    /**
+     * _onDidChangeTreeData（事件发射器）：
+     *   这是 VSCode 的机制：树内容变化时，调用 .fire() 发射事件，
+     *   VSCode 收到后自动刷新树视图。
+     *
+     * 为什么用下划线 _ 开头？
+     *   这个属性是"私有"的（虽然 TypeScript 没强制 private），
+     *   下划线是约定俗成的标记：不要直接从外部调用。
+     *   外部应该通过 refresh() 方法来触发刷新。
+     *
+     * 泛型 <NavNode | undefined> 表示事件的数据类型：
+     *   fire(undefined) = 整棵树都变了，全部刷新
+     *   fire(某个节点) = 只有这个节点变了
+     */
     private _onDidChangeTreeData = new vscode.EventEmitter<NavNode | undefined>();
-    // getter 语法：像属性一样访问，背后执行的是函数
+
+    /**
+     * onDidChangeTreeData（只读的事件监听器）：
+     *   这是 VSCode 框架调用的属性，用于订阅刷新事件。
+     *   getter 语法（get）允许像属性一样访问，实际执行的是函数。
+     *   "readonly" 防止外部代码意外替换掉这个监听器。
+     */
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
+    /**
+     * constructor 的参数属性快捷写法：
+     *   private tree: NavTree 自动创建 this.tree
+     *   为什么存 tree？因为需要读取 tree.root 和 tree.currentNode 来渲染
+     */
     constructor(private tree: NavTree) {}
 
-    /** 通知 VSCode 刷新树视图（fire(undefined) = 整个树都可能变了） */
+    /** 通知 VSCode 刷新整个树视图 */
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);
     }
 
-    /** 把数据节点转成 VSCode 树能显示的项目 */
+    /**
+     * 把数据节点转成 VSCode 的树节点（TreeItem）。
+     * 每个属性控制树节点的一个视觉方面。
+     */
     getTreeItem(element: NavNode): vscode.TreeItem {
-        const isCurrent = element === this.tree.currentNode; // 检查是否当前节点
+        const isCurrent = element === this.tree.currentNode;
         const item = new vscode.TreeItem(element.symbolName || '(root)');
+
+        // description：标题右边的灰色文字，显示文件名:行号
         item.description = `${this.shortFileName(element.uri)}:${element.line}`;
 
-        // TreeItem.color 不是公开 API，用 (item as any) 跳过类型检查
+        // color：标题的颜色。这个属性不是公开 API，
+        // 所以用 (item as any) 跳过 TypeScript 的类型检查
         const colorIndex = this.getFileColorIndex(element.uri);
         (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
 
-        // 当前节点用箭头图标，其他用函数图标
+        // iconPath：节点图标。当前节点用箭头，其他用函数图标
         item.iconPath = isCurrent
             ? new vscode.ThemeIcon('arrow-right')
             : new vscode.ThemeIcon('symbol-method');
 
-        // 点击节点时执行的命令
+        // command：用户点击时执行的命令
         item.command = {
             command: 'backtrace._jumpToNode',
             title: 'Jump to location',
             arguments: [element],
         };
 
+        // contextValue：用于上下文菜单和 when 表达式
         item.contextValue = isCurrent ? 'currentNode' : 'node';
         return item;
     }
 
-    /** 获取子节点。element 为空时返回根节点 */
+    /** 获取子节点。element 是 undefined 时返回根节点（VSCode 的约定） */
     getChildren(element?: NavNode): NavNode[] {
         if (!this.tree.root) return [];
         if (!element) return [this.tree.root];
@@ -67,15 +96,26 @@ export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
         return element.parent;
     }
 
-    /** 从 URI 中提取文件名 */
+    /** 从 URI 中提取简短的文件名 */
     private shortFileName(uri: string): string {
         return uri.split('/').pop() || uri.split('\\').pop() || uri;
     }
 
-    /** 文件 → 颜色索引 映射表（同一文件始终同一颜色） */
+    /**
+     * fileColorMap（文件 → 颜色索引 的映射表）：
+     *   为什么需要这个？同一文件的所有节点应该显示同一种颜色。
+     *   Map 是 ES6 的键值对集合，比普通对象更适合做映射。
+     *   因为键是字符串（URI），Map 和对象的性能差不多。
+     */
     private fileColorMap = new Map<string, number>();
+
+    /**
+     * nextColorIndex（下一个可用的颜色索引）：
+     *   每遇到一个新文件就 +1，循环使用 FILE_COLORS 调色板。
+     */
     private nextColorIndex = 0;
 
+    /** 获取文件对应的颜色索引（首次访问自动分配新颜色） */
     private getFileColorIndex(uri: string): number {
         if (!this.fileColorMap.has(uri)) {
             this.fileColorMap.set(uri, this.nextColorIndex++);
@@ -84,13 +124,17 @@ export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
     }
 }
 
-/** 注册内部命令 _jumpToNode（用户点击树节点时执行） */
+/**
+ * 注册内部命令 _jumpToNode。
+ * 这个命令不在命令面板显示，只有树视图的点击操作会触发它。
+ * 为什么需要单独注册？TreeItem.command 只能引用一个命令 ID。
+ */
 export function registerJumpCommand(context: vscode.ExtensionContext, tree: NavTree): void {
     const disposable = vscode.commands.registerCommand('backtrace._jumpToNode', (node: NavNode) => {
         if (!node) return;
-        tree.currentNode = node;
-        navigateToNode(node);
-        vscode.commands.executeCommand('backtrace._treeChanged');
+        tree.currentNode = node;  // 更新当前节点
+        navigateToNode(node);     // 跳转
+        vscode.commands.executeCommand('backtrace._treeChanged'); // 刷新 UI
     });
     context.subscriptions.push(disposable);
 }
