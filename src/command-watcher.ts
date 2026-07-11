@@ -34,7 +34,7 @@ interface PendingCapture {
   fromLine: number; // 跳转前的行号
   fromColumn: number; // 跳转前的列号
   symbolName: string; // 跳转前光标所在的符号名
-  timer: NodeJS.Timeout; // setTimeout 返回的计时器句柄，用于取消等待
+  timer: ReturnType<typeof setTimeout>; // setTimeout 返回的计时器句柄，用于取消等待
 }
 
 /**

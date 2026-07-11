@@ -63,7 +63,7 @@ export function activate(context: vscode.ExtensionContext) {
   //    这个命令由其他模块在导航变化时主动触发（executeCommand）
   //    为什么用 registerCommand 而不是 EventEmitter？因为 executeCommand
   //    可以被非 TypeScript 代码调用（比如 future 的 webview 或扩展）。
-  let persistTimer: NodeJS.Timeout | null = null;
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
   const persistHandler = vscode.commands.registerCommand('backtrace._treeChanged', () => {
     // ?. 可选链：treeProvider 和 stackProvider 在注册此命令的
