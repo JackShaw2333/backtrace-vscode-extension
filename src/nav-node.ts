@@ -17,57 +17,57 @@
  * 然后把它挂在 A 节点的 children 列表里。
  */
 export interface NavNode {
-    /**
-     * 文件 URI。
-     * 为什么不用文件路径字符串？VSCode 的文件定位 API 都要求 URI 格式。
-     * 例如：file:///c:/project/src/app.ts
-     */
-    uri: string;
+  /**
+   * 文件 URI。
+   * 为什么不用文件路径字符串？VSCode 的文件定位 API 都要求 URI 格式。
+   * 例如：file:///c:/project/src/app.ts
+   */
+  uri: string;
 
-    /**
-     * 行号（从 1 开始）。
-     * 为什么不是从 0 开始？人类的直觉是"第一行"= 行号 1。
-     * VSCode 内部用的是 0-based，但我们存的时候 +1，
-     * 在跳转时 -1 还原。
-     */
-    line: number;
+  /**
+   * 行号（从 1 开始）。
+   * 为什么不是从 0 开始？人类的直觉是"第一行"= 行号 1。
+   * VSCode 内部用的是 0-based，但我们存的时候 +1，
+   * 在跳转时 -1 还原。
+   */
+  line: number;
 
-    /** 列号（从 1 开始）。和行号一样的原因 */
-    column: number;
+  /** 列号（从 1 开始）。和行号一样的原因 */
+  column: number;
 
-    /**
-     * 光标处的符号名。
-     * 例如函数名 "handleClick"、变量名 "count"。
-     * 用于在 UI 中显示"你跳转到了哪里"。
-     * 获取方式：document.getWordRangeAtPosition() + getText()。
-     */
-    symbolName: string;
+  /**
+   * 光标处的符号名。
+   * 例如函数名 "handleClick"、变量名 "count"。
+   * 用于在 UI 中显示"你跳转到了哪里"。
+   * 获取方式：document.getWordRangeAtPosition() + getText()。
+   */
+  symbolName: string;
 
-    /**
-     * 子节点列表。
-     * NavNode[] 是 TypeScript 数组类型，表示"由 NavNode 组成的数组"。
-     * 为什么是数组？一个节点可能跳到多个不同的位置（例如从 A 跳到 B，
-     * 回到 A 后，又从 A 跳到 C），所以需要多个子节点。
-     */
-    children: NavNode[];
+  /**
+   * 子节点列表。
+   * NavNode[] 是 TypeScript 数组类型，表示"由 NavNode 组成的数组"。
+   * 为什么是数组？一个节点可能跳到多个不同的位置（例如从 A 跳到 B，
+   * 回到 A 后，又从 A 跳到 C），所以需要多个子节点。
+   */
+  children: NavNode[];
 
-    /**
-     * 父节点。
-     * "NavNode | null" 是 TypeScript 的联合类型，表示"要么是 NavNode，要么是 null"。
-     * 为什么可能为 null？根节点没有父节点。
-     * 没有循环引用的问题吗？有，所以序列化时需要用索引代替指针。
-     */
-    parent: NavNode | null;
+  /**
+   * 父节点。
+   * "NavNode | null" 是 TypeScript 的联合类型，表示"要么是 NavNode，要么是 null"。
+   * 为什么可能为 null？根节点没有父节点。
+   * 没有循环引用的问题吗？有，所以序列化时需要用索引代替指针。
+   */
+  parent: NavNode | null;
 
-    /**
-     * 创建时间戳（毫秒）。
-     * 为什么用 number 而不是 Date 或 string？
-     *   - Date 对象不能直接 JSON.stringify
-     *   - 字符串不易做数学比较（排序、差值计算）
-     *   - number 方便：排序叶子节点时直接 a.timestamp - b.timestamp
-     * 为什么需要这个字段？深度裁剪时删掉最旧的叶子节点。
-     */
-    timestamp: number;
+  /**
+   * 创建时间戳（毫秒）。
+   * 为什么用 number 而不是 Date 或 string？
+   *   - Date 对象不能直接 JSON.stringify
+   *   - 字符串不易做数学比较（排序、差值计算）
+   *   - number 方便：排序叶子节点时直接 a.timestamp - b.timestamp
+   * 为什么需要这个字段？深度裁剪时删掉最旧的叶子节点。
+   */
+  timestamp: number;
 }
 
 /**
@@ -88,26 +88,26 @@ export interface NavNode {
  * - childrenIndices：子节点们在数组中的位置列表
  */
 export interface SerializedNavNode {
-    uri: string;
-    line: number;
-    column: number;
-    symbolName: string;
+  uri: string;
+  line: number;
+  column: number;
+  symbolName: string;
 
-    /**
-     * 父节点在数组中的索引。
-     * 为什么是 number | null？根节点没有父节点，索引为 null。
-     * 为什么用索引而不是字符串指向？数组索引查找是 O(1) 常数时间。
-     */
-    parentIndex: number | null;
+  /**
+   * 父节点在数组中的索引。
+   * 为什么是 number | null？根节点没有父节点，索引为 null。
+   * 为什么用索引而不是字符串指向？数组索引查找是 O(1) 常数时间。
+   */
+  parentIndex: number | null;
 
-    /**
-     * 子节点们在数组中的索引列表。
-     * number[] 表示"由数字组成的数组"。
-     * 如果节点没有子节点，这是一个空数组 []。
-     */
-    childrenIndices: number[];
+  /**
+   * 子节点们在数组中的索引列表。
+   * number[] 表示"由数字组成的数组"。
+   * 如果节点没有子节点，这是一个空数组 []。
+   */
+  childrenIndices: number[];
 
-    timestamp: number;
+  timestamp: number;
 }
 
 /**
@@ -120,16 +120,16 @@ export interface SerializedNavNode {
  * 这个结构可以直接 JSON.stringify 保存到 VSCode 的 globalState 中。
  */
 export interface SerializedTree {
-    /** 所有节点的扁平数组（BFS 顺序） */
-    nodes: SerializedNavNode[];
+  /** 所有节点的扁平数组（BFS 顺序） */
+  nodes: SerializedNavNode[];
 
-    /**
-     * 当前节点在数组中的索引。
-     * 为什么需要这个？恢复时需要知道用户上次退出时在树的哪个位置。
-     * 为什么可能为 null？空树时没有当前节点。
-     */
-    currentNodeIndex: number | null;
+  /**
+   * 当前节点在数组中的索引。
+   * 为什么需要这个？恢复时需要知道用户上次退出时在树的哪个位置。
+   * 为什么可能为 null？空树时没有当前节点。
+   */
+  currentNodeIndex: number | null;
 
-    /** 树的最大深度限制（来自用户设置） */
-    maxDepth: number;
+  /** 树的最大深度限制（来自用户设置） */
+  maxDepth: number;
 }

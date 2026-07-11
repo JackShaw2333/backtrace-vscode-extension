@@ -30,11 +30,11 @@ import { CURSOR_STABILIZE_DELAY_MS } from './constants';
  *   在这 120ms 内，需要暂存"出发位置"，还要能取消（如果用户又执行了新命令）。
  */
 interface PendingCapture {
-    fromUri: string;      // 跳转前的文件 URI
-    fromLine: number;     // 跳转前的行号
-    fromColumn: number;   // 跳转前的列号
-    symbolName: string;   // 跳转前光标所在的符号名
-    timer: NodeJS.Timeout; // setTimeout 返回的计时器句柄，用于取消等待
+  fromUri: string; // 跳转前的文件 URI
+  fromLine: number; // 跳转前的行号
+  fromColumn: number; // 跳转前的列号
+  symbolName: string; // 跳转前光标所在的符号名
+  timer: NodeJS.Timeout; // setTimeout 返回的计时器句柄，用于取消等待
 }
 
 /**
@@ -47,129 +47,130 @@ interface PendingCapture {
  *     constructor(tree: NavTree) { this.tree = tree; }
  */
 export class CommandWatcher {
-    /**
-     * disposable（一次性资源）：
-     *   保存 vscode.commands.onDidExecuteCommand() 返回的注册句柄。
-     *   为什么保存它？扩展停用时需要调用 .dispose() 来取消监听。
-     *   为什么可能为 null？还没调用 activate() 时就是 null。
-     */
-    private disposable: vscode.Disposable | null = null;
+  /**
+   * disposable（一次性资源）：
+   *   保存 vscode.commands.onDidExecuteCommand() 返回的注册句柄。
+   *   为什么保存它？扩展停用时需要调用 .dispose() 来取消监听。
+   *   为什么可能为 null？还没调用 activate() 时就是 null。
+   */
+  private disposable: vscode.Disposable | null = null;
 
-    /**
-     * pending（待确认的跳转）：
-     *   在 120ms 等待期内暂存的临时信息。
-     *   为什么需要它？
-     *     - 如果 120ms 内用户又执行了一个命令，需要取消上一次的等待
-     *     - 120ms 后，用这里存的"出发位置"和"到达位置"做比对
-     */
-    private pending: PendingCapture | null = null;
+  /**
+   * pending（待确认的跳转）：
+   *   在 120ms 等待期内暂存的临时信息。
+   *   为什么需要它？
+   *     - 如果 120ms 内用户又执行了一个命令，需要取消上一次的等待
+   *     - 120ms 后，用这里存的"出发位置"和"到达位置"做比对
+   */
+  private pending: PendingCapture | null = null;
 
-    /**
-     * config（当前配置）：
-     *   保存用户设置，在事件处理函数中读取。
-     *   为什么要存成属性？因为 onDidExecuteCommand 的回调函数
-     *   在 activate() 之外执行，需要通过 this.config 访问配置。
-     *   "!" 是非空断言，告诉 TypeScript"这个属性在使用前一定会被赋值"。
-     */
-    private config!: BacktraceConfig;
+  /**
+   * config（当前配置）：
+   *   保存用户设置，在事件处理函数中读取。
+   *   为什么要存成属性？因为 onDidExecuteCommand 的回调函数
+   *   在 activate() 之外执行，需要通过 this.config 访问配置。
+   *   "!" 是非空断言，告诉 TypeScript"这个属性在使用前一定会被赋值"。
+   */
+  private config!: BacktraceConfig;
 
-    constructor(private tree: NavTree) {}
+  constructor(private tree: NavTree) {}
 
-    /**
-     * 开始监听。
-     *
-     * 做了四件事：
-     *   1. 保存配置
-     *   2. 把命令白名单转成 Set（为什么用 Set？.has() 比 .includes() 快很多）
-     *   3. 注册 onDidExecuteCommand 事件监听
-     *   4. 把注册句柄加入 context.subscriptions（扩展停用时自动清理）
-     */
-    activate(config: BacktraceConfig, context: vscode.ExtensionContext): void {
-        this.config = config;
-        const commandSet = new Set(config.trackedCommands);
+  /**
+   * 开始监听。
+   *
+   * 做了四件事：
+   *   1. 保存配置
+   *   2. 把命令白名单转成 Set（为什么用 Set？.has() 比 .includes() 快很多）
+   *   3. 注册 onDidExecuteCommand 事件监听
+   *   4. 把注册句柄加入 context.subscriptions（扩展停用时自动清理）
+   */
+  activate(config: BacktraceConfig, context: vscode.ExtensionContext): void {
+    this.config = config;
+    const commandSet = new Set(config.trackedCommands);
 
-        this.disposable = vscode.commands.onDidExecuteCommand((event) => {
-            // event.command 是字符串，例如 "editor.action.revealDefinition"
-            if (!commandSet.has(event.command)) return;
+    this.disposable = vscode.commands.onDidExecuteCommand((event) => {
+      // event.command 是字符串，例如 "editor.action.revealDefinition"
+      if (!commandSet.has(event.command)) return;
 
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
 
-            const position = editor.selection.active;
-            const document = editor.document;
+      const position = editor.selection.active;
+      const document = editor.document;
 
-            // 获取光标所在的"单词"（符号名）
-            // getWordRangeAtPosition 返回光标所在单词的范围
-            const wordRange = document.getWordRangeAtPosition(position);
-            const word = wordRange ? document.getText(wordRange) : '';
+      // 获取光标所在的"单词"（符号名）
+      // getWordRangeAtPosition 返回光标所在单词的范围
+      const wordRange = document.getWordRangeAtPosition(position);
+      const word = wordRange ? document.getText(wordRange) : '';
 
-            // VSCode 的行列从 0 开始，但我们从 1 开始记（更符合人的直觉）
-            const uri = document.uri.toString();
-            const line = position.line + 1;
-            const column = position.character + 1;
+      // VSCode 的行列从 0 开始，但我们从 1 开始记（更符合人的直觉）
+      const uri = document.uri.toString();
+      const line = position.line + 1;
+      const column = position.character + 1;
 
-            // 取消上一个待确认的跳转（防抖：只记最后一次）
-            if (this.pending) {
-                clearTimeout(this.pending.timer);
-            }
+      // 取消上一个待确认的跳转（防抖：只记最后一次）
+      if (this.pending) {
+        clearTimeout(this.pending.timer);
+      }
 
-            // 设置 120ms 延迟后执行确认
-            const timer = setTimeout(() => {
-                this.finalizeCapture(uri, line, column, word);
-            }, CURSOR_STABILIZE_DELAY_MS);
+      // 设置 120ms 延迟后执行确认
+      const timer = setTimeout(() => {
+        this.finalizeCapture(uri, line, column, word);
+      }, CURSOR_STABILIZE_DELAY_MS);
 
-            this.pending = { fromUri: uri, fromLine: line, fromColumn: column, symbolName: word, timer };
-        });
+      this.pending = {
+        fromUri: uri,
+        fromLine: line,
+        fromColumn: column,
+        symbolName: word,
+        timer,
+      };
+    });
 
-        if (this.disposable) {
-            context.subscriptions.push(this.disposable);
-        }
+    if (this.disposable) {
+      context.subscriptions.push(this.disposable);
     }
+  }
 
-    /**
-     * 停止监听，清理资源。
-     * 在扩展停用或配置变更时调用。
-     */
-    deactivate(): void {
-        // 取消待确认的跳转
-        if (this.pending) {
-            clearTimeout(this.pending.timer);
-            this.pending = null;
-        }
-        // "?." 是可选链：如果 disposable 不是 null 才调用 dispose()
-        this.disposable?.dispose();
-        this.disposable = null;
+  /**
+   * 停止监听，清理资源。
+   * 在扩展停用或配置变更时调用。
+   */
+  deactivate(): void {
+    // 取消待确认的跳转
+    if (this.pending) {
+      clearTimeout(this.pending.timer);
+      this.pending = null;
     }
+    // "?." 是可选链：如果 disposable 不是 null 才调用 dispose()
+    this.disposable?.dispose();
+    this.disposable = null;
+  }
 
-    /**
-     * 120ms 后执行的确认函数。
-     *
-     * 做了三件事：
-     *   1. 获取 120ms 后的光标位置（"到达位置"）
-     *   2. 比对"出发位置"和"到达位置"——真的跳转了吗？
-     *   3. 确实跳转了 → 写入 NavTree
-     */
-    private finalizeCapture(
-        fromUri: string,
-        fromLine: number,
-        fromColumn: number,
-        symbolName: string,
-    ): void {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
+  /**
+   * 120ms 后执行的确认函数。
+   *
+   * 做了三件事：
+   *   1. 获取 120ms 后的光标位置（"到达位置"）
+   *   2. 比对"出发位置"和"到达位置"——真的跳转了吗？
+   *   3. 确实跳转了 → 写入 NavTree
+   */
+  private finalizeCapture(fromUri: string, fromLine: number, fromColumn: number, symbolName: string): void {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
 
-        const position = editor.selection.active;
-        const toUri = editor.document.uri.toString();
-        const toLine = position.line + 1;
-        const toColumn = position.character + 1;
+    const position = editor.selection.active;
+    const toUri = editor.document.uri.toString();
+    const toLine = position.line + 1;
+    const toColumn = position.character + 1;
 
-        // 位置完全没变 → 命令没有产生跳转（可能是误触命令或超时）
-        if (toUri === fromUri && toLine === fromLine && toColumn === fromColumn) return;
+    // 位置完全没变 → 命令没有产生跳转（可能是误触命令或超时）
+    if (toUri === fromUri && toLine === fromLine && toColumn === fromColumn) return;
 
-        // 通过过滤 → 记录跳转
-        this.tree.addJump(toUri, toLine, toColumn, symbolName);
+    // 通过过滤 → 记录跳转
+    this.tree.addJump(toUri, toLine, toColumn, symbolName);
 
-        // 触发自定义事件，通知所有 UI 刷新
-        vscode.commands.executeCommand('backtrace._treeChanged');
-    }
+    // 触发自定义事件，通知所有 UI 刷新
+    vscode.commands.executeCommand('backtrace._treeChanged');
+  }
 }

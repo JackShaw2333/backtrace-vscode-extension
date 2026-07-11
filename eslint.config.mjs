@@ -9,6 +9,8 @@ export default tseslint.config(
         rules: {
             'no-console': 'off',
             '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+            'indent': 'off',
+            '@typescript-eslint/indent': 'off',
         },
     },
     {

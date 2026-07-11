@@ -44,35 +44,35 @@ import { CONFIG_NAMESPACE, DEFAULT_TRACKED_COMMANDS } from './constants';
 // 它不包含逻辑，只描述形状。就像一张蓝图。
 
 export interface BacktraceConfig {
-    /**
-     * 白名单：哪些命令触发时记录导航跳转？
-     *
-     * 例如默认值 ["editor.action.revealDefinition"]，
-     * 这意味着只有 F12/Go to Definition 会被记录。
-     * 用户可以在设置中改成 ["editor.action.goToReferences"],
-     * 或者同时追踪多条命令。
-     *
-     * string[] 表示"字符串数组"——一个列表，每个元素是一个命令 ID。
-     */
-    trackedCommands: string[];
+  /**
+   * 白名单：哪些命令触发时记录导航跳转？
+   *
+   * 例如默认值 ["editor.action.revealDefinition"]，
+   * 这意味着只有 F12/Go to Definition 会被记录。
+   * 用户可以在设置中改成 ["editor.action.goToReferences"],
+   * 或者同时追踪多条命令。
+   *
+   * string[] 表示"字符串数组"——一个列表，每个元素是一个命令 ID。
+   */
+  trackedCommands: string[];
 
-    /**
-     * 导航树最大深度。
-     *
-     * 如果用户一天内跳了上千次，树会非常深。
-     * 超出这个深度时，自动删除最旧的分支。
-     * 类型是 number（数字），默认 50。
-     */
-    maxTreeDepth: number;
+  /**
+   * 导航树最大深度。
+   *
+   * 如果用户一天内跳了上千次，树会非常深。
+   * 超出这个深度时，自动删除最旧的分支。
+   * 类型是 number（数字），默认 50。
+   */
+  maxTreeDepth: number;
 
-    /**
-     * 是否跨会话持久化？
-     *
-     * true  → 导航树存入 VSCode 的 globalState，重启后还在
-     * false → 重启后导航树清空
-     * 类型是 boolean（布尔值），要么 true 要么 false。
-     */
-    persistHistory: boolean;
+  /**
+   * 是否跨会话持久化？
+   *
+   * true  → 导航树存入 VSCode 的 globalState，重启后还在
+   * false → 重启后导航树清空
+   * 类型是 boolean（布尔值），要么 true 要么 false。
+   */
+  persistHistory: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -87,57 +87,55 @@ export interface BacktraceConfig {
 // 按照 BacktraceConfig 的蓝图，一一对应填上值。
 
 export function readConfig(): BacktraceConfig {
-    // ── step 1: 拿到"配置字典" ──
+  // ── step 1: 拿到"配置字典" ──
+  //
+  // getConfiguration('backtrace') 告诉 VSCode：
+  // "把 settings.json 里所有以 backtrace. 开头的项给我"
+  // 返回的对象 cfg 就像：
+  //   { trackedCommands: [...], maxTreeDepth: 50, persistHistory: true }
+  // 但还不是我们定义的 BacktraceConfig 类型，需要手动取值。
+  const cfg = vscode.workspace.getConfiguration(CONFIG_NAMESPACE);
+
+  // ── step 2: 逐个取值 ──
+  // ── step 3: 组装成 BacktraceConfig 对象并返回 ──
+  return {
+    // cfg.get('trackedCommands') 读的是 backtrace.trackedCommands
     //
-    // getConfiguration('backtrace') 告诉 VSCode：
-    // "把 settings.json 里所有以 backtrace. 开头的项给我"
-    // 返回的对象 cfg 就像：
-    //   { trackedCommands: [...], maxTreeDepth: 50, persistHistory: true }
-    // 但还不是我们定义的 BacktraceConfig 类型，需要手动取值。
-    const cfg = vscode.workspace.getConfiguration(CONFIG_NAMESPACE);
+    // <string[]> 是泛型参数，告诉 TypeScript：
+    // "这个 get 调用返回的是一个字符串数组"
+    // 如果不写，TypeScript 不知道返回类型，会推测为 any（失去类型保护）。
+    //
+    // 第二个参数 ['editor.action.revealDefinition'] 是"默认值"：
+    //   如果用户从来没设置过这个选项 → 返回这个默认值
+    //   如果用户设置过 → 返回用户设置的值
+    //
+    // 注意这里用了 [...DEFAULT_TRACKED_COMMANDS] 而不是直接传 DEFAULT_TRACKED_COMMANDS。
+    // 为什么？因为 DEFAULT_TRACKED_COMMANDS 是 readonly（只读），
+    // 而 cfg.get 需要的是一个可变数组。
+    // ... 展开运算符把只读数组的内容"复制"到一个新数组中。
+    // 可以理解为：把苹果从只读的篮子里拿出来，放进一个可以修改的新篮子。
+    //
+    // 如果不理解为什么需要 readonly，可以简单记为：
+    //   TypeScript 使用 readonly 防止你意外修改常量，
+    //   需要改的时候就要用 [...] 复制一份。
+    trackedCommands: cfg.get<string[]>('trackedCommands', [...DEFAULT_TRACKED_COMMANDS]),
 
-    // ── step 2: 逐个取值 ──
-    // ── step 3: 组装成 BacktraceConfig 对象并返回 ──
-    return {
-        // cfg.get('trackedCommands') 读的是 backtrace.trackedCommands
-        //
-        // <string[]> 是泛型参数，告诉 TypeScript：
-        // "这个 get 调用返回的是一个字符串数组"
-        // 如果不写，TypeScript 不知道返回类型，会推测为 any（失去类型保护）。
-        //
-        // 第二个参数 ['editor.action.revealDefinition'] 是"默认值"：
-        //   如果用户从来没设置过这个选项 → 返回这个默认值
-        //   如果用户设置过 → 返回用户设置的值
-        //
-        // 注意这里用了 [...DEFAULT_TRACKED_COMMANDS] 而不是直接传 DEFAULT_TRACKED_COMMANDS。
-        // 为什么？因为 DEFAULT_TRACKED_COMMANDS 是 readonly（只读），
-        // 而 cfg.get 需要的是一个可变数组。
-        // ... 展开运算符把只读数组的内容"复制"到一个新数组中。
-        // 可以理解为：把苹果从只读的篮子里拿出来，放进一个可以修改的新篮子。
-        //
-        // 如果不理解为什么需要 readonly，可以简单记为：
-        //   TypeScript 使用 readonly 防止你意外修改常量，
-        //   需要改的时候就要用 [...] 复制一份。
-        trackedCommands: cfg.get<string[]>('trackedCommands', [
-            ...DEFAULT_TRACKED_COMMANDS,
-        ]),
+    // 读 backtrace.maxTreeDepth
+    // <number> 告诉 TypeScript 返回的是数字
+    // 默认值 50
+    maxTreeDepth: cfg.get<number>('maxTreeDepth', 50),
 
-        // 读 backtrace.maxTreeDepth
-        // <number> 告诉 TypeScript 返回的是数字
-        // 默认值 50
-        maxTreeDepth: cfg.get<number>('maxTreeDepth', 50),
-
-        // 读 backtrace.persistHistory
-        // <boolean> 告诉 TypeScript 返回的是布尔值
-        // 默认值 true
-        persistHistory: cfg.get<boolean>('persistHistory', true),
-    };
-    // 最终返回的对象就像这样：
-    // {
-    //   trackedCommands: ['editor.action.revealDefinition'],
-    //   maxTreeDepth: 50,
-    //   persistHistory: true,
-    // }
+    // 读 backtrace.persistHistory
+    // <boolean> 告诉 TypeScript 返回的是布尔值
+    // 默认值 true
+    persistHistory: cfg.get<boolean>('persistHistory', true),
+  };
+  // 最终返回的对象就像这样：
+  // {
+  //   trackedCommands: ['editor.action.revealDefinition'],
+  //   maxTreeDepth: 50,
+  //   persistHistory: true,
+  // }
 }
 
 // ═══════════════════════════════════════════════════════════════

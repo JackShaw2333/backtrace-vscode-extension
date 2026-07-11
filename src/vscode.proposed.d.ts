@@ -19,15 +19,15 @@
  */
 
 declare module 'vscode' {
-    export namespace commands {
-        /**
-         * 每次用户执行一个命令时触发的事件。
-         * 不管命令是否成功执行，都会触发。
-         *
-         * @eventProperty
-         * @param event.command - 命令 ID，例如 "editor.action.revealDefinition"
-         * @param event.args - 传递给命令的参数（大多数情况下不需要）
-         */
-        export const onDidExecuteCommand: Event<{ command: string; args?: unknown[] }>;
-    }
+  export namespace commands {
+    /**
+     * 每次用户执行一个命令时触发的事件。
+     * 不管命令是否成功执行，都会触发。
+     *
+     * @eventProperty
+     * @param event.command - 命令 ID，例如 "editor.action.revealDefinition"
+     * @param event.args - 传递给命令的参数（大多数情况下不需要）
+     */
+    export const onDidExecuteCommand: Event<{ command: string; args?: unknown[] }>;
+  }
 }

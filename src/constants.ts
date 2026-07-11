@@ -18,20 +18,18 @@
 
 /** 所有预置的可追踪 VSCode 命令 ID */
 export const PRESET_COMMANDS = [
-    'editor.action.revealDefinition',     // F12 / Ctrl+Click：转到定义
-    'editor.action.revealDeclaration',     // 转到声明
-    'editor.action.goToTypeDefinition',    // 转到类型定义
-    'editor.action.goToImplementation',    // 转到实现
-    'editor.action.goToReferences',        // 转到引用
-    'editor.action.peekDefinition',        // 预览定义（不跳转，弹出浮窗）
-    'editor.action.peekImplementation',    // 预览实现
-    'editor.action.peekReferences',        // 预览引用
+  'editor.action.revealDefinition', // F12 / Ctrl+Click：转到定义
+  'editor.action.revealDeclaration', // 转到声明
+  'editor.action.goToTypeDefinition', // 转到类型定义
+  'editor.action.goToImplementation', // 转到实现
+  'editor.action.goToReferences', // 转到引用
+  'editor.action.peekDefinition', // 预览定义（不跳转，弹出浮窗）
+  'editor.action.peekImplementation', // 预览实现
+  'editor.action.peekReferences', // 预览引用
 ] as const;
 
 /** 默认启用的命令（刚安装时只追踪"转到定义"，最常用的导航操作） */
-export const DEFAULT_TRACKED_COMMANDS: readonly string[] = [
-    'editor.action.revealDefinition',
-];
+export const DEFAULT_TRACKED_COMMANDS: readonly string[] = ['editor.action.revealDefinition'];
 
 /**
  * 光标稳定等待时间（毫秒 = 0.12 秒）。
@@ -55,11 +53,11 @@ export const PERSISTENCE_KEY = 'backtrace.navTree';
  * 颜色选择依据：在 VSCode 的浅色和深色主题中都能看清楚。
  */
 export const FILE_COLORS = [
-    '#c586c0', // 紫色
-    '#9cdcfe', // 浅蓝
-    '#dcdcaa', // 黄色
-    '#73c991', // 浅绿
-    '#f88070', // 浅红
-    '#ce9178', // 橙色
-    '#cca700', // 金色
+  '#c586c0', // 紫色
+  '#9cdcfe', // 浅蓝
+  '#dcdcaa', // 黄色
+  '#73c991', // 浅绿
+  '#f88070', // 浅红
+  '#ce9178', // 橙色
+  '#cca700', // 金色
 ];
