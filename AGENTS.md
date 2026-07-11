@@ -2,7 +2,7 @@
 
 VSCode 扩展：用**树形导航**替代 VSCode 原生线性堆栈导航历史，仅记录有意义的导航跳转（F12/Ctrl+Click 等），支持后退/前进、侧边栏树视图、持久化。
 
-> **当前状态：设计阶段** — 无源代码文件，仅有以下设计文档。
+> **当前状态：完整实现已完成** — 所有模块通过 tsc 编译，17 个测试用例通过。详情见 `docs/superpowers/`。
 
 ---
 
@@ -10,8 +10,8 @@ VSCode 扩展：用**树形导航**替代 VSCode 原生线性堆栈导航历史�
 
 - **用途**：解决 VSCode Alt+← 经过太多无关点击的问题，用树结构管理导航历史
 - **栈**：TypeScript + VSCode Extension API
-- **入口点**：`src/extension.ts`（activate / deactivate，待创建）
-- **包名**：在 `package.json` 中定义（待创建）
+- **入口点**：`src/extension.ts`（activate / deactivate）
+- **包名**：`backtrace`（`package.json` 中定义）
 - **根目录**：`C:\Users\jared\backtrace-vscode-extension\`
 
 ---
@@ -23,10 +23,10 @@ VSCode 扩展：用**树形导航**替代 VSCode 原生线性堆栈导航历史�
 | 命令 | 用途 |
 |------|------|
 | `npm install` | 安装依赖 |
-| `npm run compile` | tsc 编译 |
+| `npm run compile` | tsc 编译到 out/ |
 | `npm run watch` | 监听模式编译 |
-| `npm run lint` | eslint 检查 |
-| `npm run test` | 运行测试 |
+| `npm run lint` | eslint 检查（flat config） |
+| `npm run test` | 运行 Mocha 测试 |
 | `F5`（VSCode） | 启动 Extension Development Host 调试 |
 
 ---
@@ -126,16 +126,23 @@ backtrace.goForward：
 
 ## Conventions
 
-（项目尚未实现，以下为预期约定）
-
 - **语言**：TypeScript，严格模式
 - **格式化**：Prettier（预期）
-- **检查**：ESLint（预期）
-- **测试框架**：Mocha（VSCode 扩展测试标准方案）
+- **检查**：ESLint（已配置 flat config `eslint.config.mjs`）
+- **测试框架**：Mocha + tdd 模式（`--ui tdd`）
 - **命名**：camelCase 变量/函数，PascalCase 类/类型/接口，kebab-case 文件名
 - **导入**：ESM，避免 `require`
 - **状态管理**：通过 `context.globalState` 持久化，`context.subscriptions` 注册 dispose
 - **UI**：TreeView + WebviewView 均在 `package.json` 的 `contributes` 中声明
+- **构建**：`tsc` 编译到 `out/` 目录
+- **提交规范**：每次对代码的增删修改后**必须立即 commit**，commit message 格式：
+  - `feat: xxx` — 新功能
+  - `fix: xxx` — 修复 bug
+  - `docs: xxx` — 文档/注释修改
+  - `chore: xxx` — 构建/配置/杂项
+  - `test: xxx` — 测试相关
+  - `refactor: xxx` — 重构
+  - 不允许出现未 commit 的修改跨多个 session
 
 ---
 
