@@ -26,6 +26,16 @@ export function registerGoBack(context: vscode.ExtensionContext, tree: NavTree):
     }
 
     navigateToNode(target);
+
+    // executeCommand 是 VSCode 的"全局事件总线"：可以触发任意注册过的命令。
+    // 'backtrace._treeChanged' 是一个内部命令（下划线开头表示"不对外公开"），
+    // 在 extension.ts 第 68 行注册。
+    //
+    // 它做了两件事：
+    //   ① treeProvider.refresh() → 刷新侧边栏的 Backtrace Tree 树视图
+    //   ② stackProvider.update() → 刷新底部面板的 Backtrace Stack
+    //
+    // 同时还在 500ms 防抖后把导航树保存到 VSCode 的持久化存储中。
     vscode.commands.executeCommand('backtrace._treeChanged');
   });
 
