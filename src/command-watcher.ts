@@ -30,10 +30,10 @@ import { CURSOR_STABILIZE_DELAY_MS } from './constants';
  *   在这 120ms 内，需要暂存"出发位置"，还要能取消（如果用户又执行了新命令）。
  */
 interface PendingCapture {
-  fromUri: string; // 跳转前的文件 URI
-  fromLine: number; // 跳转前的行号
-  fromColumn: number; // 跳转前的列号
-  symbolName: string; // 跳转前光标所在的符号名
+  fromUri: string;      // 跳转前的文件 URI
+  fromLine: number;     // 跳转前的行号
+  fromColumn: number;   // 跳转前的列号
+  symbolName: string;   // 跳转前光标所在的符号名
   timer: ReturnType<typeof setTimeout>; // setTimeout 返回的计时器句柄，用于取消等待
 }
 
@@ -85,39 +85,55 @@ export class CommandWatcher {
    *   4. 把注册句柄加入 context.subscriptions（扩展停用时自动清理）
    */
   activate(config: BacktraceConfig, context: vscode.ExtensionContext): void {
-    this.config = config;
+    this.config = config;                                     // 保存配置供事件回调使用
+
+    // 把白名单数组转成 Set。Set 的 .has() 查找时间复杂度 O(1)，
+    // 数组的 .includes() 是 O(n)——数组越长就越慢。
     const commandSet = new Set(config.trackedCommands);
 
+    // onDidExecuteCommand: 用户每执行一个 VSCode 命令就触发一次。
+    // event.command 是字符串命令 ID（例如 "editor.action.revealDefinition"）。
+    // 注意：这是"提议中的 API"，需要在 package.json 中声明 enabledApiProposals。
     this.disposable = vscode.commands.onDidExecuteCommand((event) => {
-      // event.command 是字符串，例如 "editor.action.revealDefinition"
+      // 不在白名单中 → 忽略这次命令。
+      // 白名单中只有导航命令（F12/Ctrl+Click 等），其他命令不记录。
       if (!commandSet.has(event.command)) return;
 
+      // activeTextEditor: 当前活跃的编辑器。
+      // 如果用户当前没在编辑文件（比如在看设置页面），返回 null。
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
 
+      // selection.active: 光标的当前位置（一个 Position 对象，有 line 和 character）。
       const position = editor.selection.active;
       const document = editor.document;
 
-      // 获取光标所在的"单词"（符号名）
-      // getWordRangeAtPosition 返回光标所在单词的范围
+      // getWordRangeAtPosition: 获取光标所在"单词"的起止范围。
+      // 比如光标在 "handleClick" 这个单词上，就返回这个词的范围。
+      // getText: 获取这个范围的文本内容。
       const wordRange = document.getWordRangeAtPosition(position);
       const word = wordRange ? document.getText(wordRange) : '';
 
-      // VSCode 的行列从 0 开始，但我们从 1 开始记（更符合人的直觉）
-      const uri = document.uri.toString();
-      const line = position.line + 1;
-      const column = position.character + 1;
+      // VSCode 中行列从 0 开始计数（0 代表第 1 行/第 1 列）。
+      // 我们 +1 转成从 1 开始，更符合人的直觉习惯。
+      const uri = document.uri.toString();    // "file:///c:/project/app.ts"
+      const line = position.line + 1;          // 1-based 行号
+      const column = position.character + 1;   // 1-based 列号
 
-      // 取消上一个待确认的跳转（防抖：只记最后一次）
+      // 取消上一次的待确认跳转（防抖机制）。
+      // 如果用户在 120ms 内连续执行了多个命令，只处理最后一次。
+      // 这避免了连续快速操作时重复记录。
       if (this.pending) {
         clearTimeout(this.pending.timer);
       }
 
-      // 设置 120ms 延迟后执行确认
+      // 设置 120ms 延迟。到期后执行 finalizeCapture 确认跳转结果。
+      // setTimeout 是 JavaScript 内置函数，在指定毫秒后执行回调。
       const timer = setTimeout(() => {
         this.finalizeCapture(uri, line, column, word);
       }, CURSOR_STABILIZE_DELAY_MS);
 
+      // 暂存本次跳转的"出发位置"信息，供 finalizeCapture 比对。
       this.pending = {
         fromUri: uri,
         fromLine: line,
@@ -127,6 +143,7 @@ export class CommandWatcher {
       };
     });
 
+    // 把注册句柄加入 subscriptions，扩展停用时 VSCode 会自动 dispose。
     if (this.disposable) {
       context.subscriptions.push(this.disposable);
     }
@@ -137,12 +154,13 @@ export class CommandWatcher {
    * 在扩展停用或配置变更时调用。
    */
   deactivate(): void {
-    // 取消待确认的跳转
+    // 取消等待中的确认（如果有的话）
     if (this.pending) {
-      clearTimeout(this.pending.timer);
-      this.pending = null;
+      clearTimeout(this.pending.timer);   // 取消 setTimeout
+      this.pending = null;                 // 释放引用
     }
-    // "?." 是可选链：如果 disposable 不是 null 才调用 dispose()
+    // "?." 是可选链：如果 disposable 是 null 就不调用 dispose()，不会报错。
+    // 等价于：if (this.disposable) { this.disposable.dispose(); }
     this.disposable?.dispose();
     this.disposable = null;
   }
@@ -155,22 +173,32 @@ export class CommandWatcher {
    *   2. 比对"出发位置"和"到达位置"——真的跳转了吗？
    *   3. 确实跳转了 → 写入 NavTree
    */
-  private finalizeCapture(fromUri: string, fromLine: number, fromColumn: number, symbolName: string): void {
+  private finalizeCapture(
+    fromUri: string,
+    fromLine: number,
+    fromColumn: number,
+    symbolName: string,
+  ): void {
+    // 再次获取当前编辑器——120ms 后用户可能已经切换到其他窗口了
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
 
+    // 获取"跳转后"的光标位置
     const position = editor.selection.active;
     const toUri = editor.document.uri.toString();
     const toLine = position.line + 1;
     const toColumn = position.character + 1;
 
-    // 位置完全没变 → 命令没有产生跳转（可能是误触命令或超时）
+    // 位置完全没变 → 命令没有实际产生跳转。
+    // 可能的原因：命令执行失败了，或者超出了 120ms 用户又取消了跳转。
+    // 三个维度（文件、行、列）都一致才判定为"没动"。
     if (toUri === fromUri && toLine === fromLine && toColumn === fromColumn) return;
 
-    // 通过过滤 → 记录跳转
+    // 通过以上过滤 → 这是一次有效的导航跳转，记录到导航树。
     this.tree.addJump(toUri, toLine, toColumn, symbolName);
 
-    // 触发自定义事件，通知所有 UI 刷新
+    // executeCommand('backtrace._treeChanged') 触发内部事件，
+    // 通知侧边栏树视图和底部堆栈面板刷新显示。
     vscode.commands.executeCommand('backtrace._treeChanged');
   }
 }
