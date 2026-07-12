@@ -159,7 +159,21 @@ export class CommandWatcher {
       };
     });
 
-    // 把注册句柄加入 subscriptions，扩展停用时 VSCode 会自动 dispose。
+    // ── 把注册句柄交给 VSCode 管理 ──
+    //
+    // context.subscriptions 是一个数组，VSCode 扩展停用时自动遍历它，
+    // 调用每一项的 .dispose() 方法。这是 VSCode 的标准清理机制。
+    //
+    // 为什么要推入 subscriptions？
+    //   如果用户禁用/卸载扩展，VSCode 需要知道如何停止监听。
+    //   不推入 subscriptions 的话，即使 deactivate() 被调用，
+    //   但 deactivate() 也可能因为 VSCode 进程崩溃而没有执行。
+    //   subscriptions 是"保底清理"——无论如何都会执行 dispose。
+    //
+    // 为什么加 if (this.disposable) 判断？
+    //   onDidExecuteCommand 可能返回 undefined（极少数情况下注册会失败），
+    //   但根据 VSCode API 文档，它总是返回 Disposable 对象。
+    //   加这个判断是为了 TypeScript 类型安全，也为了防御性编程。
     if (this.disposable) {
       context.subscriptions.push(this.disposable);
     }
