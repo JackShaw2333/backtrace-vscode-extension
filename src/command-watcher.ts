@@ -91,8 +91,22 @@ export class CommandWatcher {
     // 数组的 .includes() 是 O(n)——数组越长就越慢。
     const commandSet = new Set(config.trackedCommands);
 
-    // onDidExecuteCommand: 用户每执行一个 VSCode 命令就触发一次。
-    // event.command 是字符串命令 ID（例如 "editor.action.revealDefinition"）。
+    // onDidExecuteCommand: 注册一个监听器（如同 addEventListener）。
+    // 它返回一个 Disposable 对象，赋值给 this.disposable。
+    //
+    // Disposable 是什么？
+    //   VSCode 中 "注册一个功能"时几乎都返回 Disposable。
+    //   Disposable 只有一个方法 .dispose()，调用它 = "取消注册"。
+    //   类比：addEventListener 返回的 removeEventListener 函数。
+    //
+    // this.disposable 会在回调每次执行时重新赋值吗？
+    //   不会。this.disposable 只赋值一次（本行）。
+    //   回调 (event) => { ... } 每次命令触发都会执行，
+    //   但回调内部不会修改 this.disposable。
+    //   this.disposable 代表的是 "这次监听注册" 本身，
+    //   不是每次命令执行的结果。
+    //
+    // event.command: 字符串命令 ID，例如 "editor.action.revealDefinition"。
     // 注意：这是"提议中的 API"，需要在 package.json 中声明 enabledApiProposals。
     this.disposable = vscode.commands.onDidExecuteCommand((event) => {
       // 不在白名单中 → 忽略这次命令。
