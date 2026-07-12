@@ -120,10 +120,26 @@ export class CommandWatcher {
       const line = position.line + 1;          // 1-based 行号
       const column = position.character + 1;   // 1-based 列号
 
-      // 取消上一次的待确认跳转（防抖机制）。
-      // 如果用户在 120ms 内连续执行了多个命令，只处理最后一次。
-      // 这避免了连续快速操作时重复记录。
+      // ── 防抖（debounce）：取消上一次等待 ──
+      //
+      // 为什么需要防抖？
+      //   假设用户快速连按了两次 F12（间隔 < 120ms）：
+      //
+      //   第一次 F12 触发：
+      //     ① 记录出发位置 → ② 设置 120ms 计时器 → ③ this.pending = {...}
+      //   第二次 F12 触发（< 120ms 后）：
+      //     ① 进入此 if → this.pending 非 null → 取消第一次的计时器
+      //     ② 执行 clearTimeout(第一次的 timer) → 第一次跳转作废
+      //     ③ 走到下面：重新记录出发位置 → 设置新的 120ms 计时器
+      //     ④ this.pending = { ...新的出发位置, timer: 新计时器 }
+      //   结果：只处理第二次 F12，第一次被丢弃。
+      //
+      // 如果不防抖：
+      //   两次 F12 会产生两个计时器，120ms 后都会触发 finalizeCapture。
+      //   导致一次导航被重复记录两次。
       if (this.pending) {
+        // clearTimeout 是 JavaScript 内置函数：取消一个 setTimeout。
+        // 传入 timer（setTimeout 的返回值），它就不会被执行了。
         clearTimeout(this.pending.timer);
       }
 
