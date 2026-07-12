@@ -69,6 +69,13 @@ export function navigateToNode(node: { uri: string; line: number; column: number
   //   VSCode 的日志中会出现红色报错，影响扩展的稳定性评分。
   vscode.workspace.openTextDocument(uri).then(
     (doc) => {
+      // showTextDocument: 切换到目标文件的 tab（如果文件已打开，不会重复打开）。
+      //
+      // selection 参数：设置光标选中位置。
+      //   new vscode.Range(startLine, startCol, endLine, endCol) 定义了一个选中范围。
+      //   这里 start 和 end 相同（行和列都一致），所以选中的是一个空范围 = 光标定位。
+      //   效果：文件切换到前台，光标停留在 node.line:node.column。
+      //
       // VSCode 的行列从 0 开始计数，所以我们存的时候 +1，
       // 这里用的时候 -1，还原回 VSCode 的 0-based 坐标。
       vscode.window.showTextDocument(doc, {
