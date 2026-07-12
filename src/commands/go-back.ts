@@ -44,9 +44,29 @@ export function registerGoBack(context: vscode.ExtensionContext, tree: NavTree):
 export function navigateToNode(node: { uri: string; line: number; column: number }): void {
   const uri = vscode.Uri.parse(node.uri);
 
-  // .then() 是 Promise 的语法。
-  // VSCode 的 API 大量使用 Promise（异步操作）。
-  // 第一个函数：成功时执行；第二个函数：失败时执行。
+  // ── Promise 是什么？ ──
+  //
+  // openTextDocument(uri) 返回一个 Promise（"承诺"）。
+  // Promise 是 JavaScript 处理"将来才完成的操作"的标准方式。
+  //
+  // 为什么需要 Promise？
+  //   打开文件是一个异步操作：VSCode 需要从磁盘读取文件内容，
+  //   这个读取需要时间（哪怕只是几毫秒）。
+  //   如果不用 Promise，代码会"卡住"等待文件读完。
+  //   用 Promise，代码继续执行后面的语句，文件读完后自动执行 .then()。
+  //
+  // Promise 的三种状态：
+  //   pending（等待中） → fulfilled（成功，进入 .then 的第一个回调）
+  //                     → rejected（失败，进入 .then 的第二个回调）
+  //   就像点外卖：下单（pending）→ 送到（fulfilled）或 取消（rejected）
+  //
+  // 这里的 .then(成功回调, 失败回调) 做了两件事：
+  //   成功：doc 参数就是打开的文件对象 → showTextDocument 显示它
+  //   失败：文件打不开（已删除/权限问题）→ 显示错误消息
+  //
+  // 为什么错误处理很重要？
+  //   如果不处理错误，Promise 失败时会抛出一个"未捕获的异常"，
+  //   VSCode 的日志中会出现红色报错，影响扩展的稳定性评分。
   vscode.workspace.openTextDocument(uri).then(
     (doc) => {
       // VSCode 的行列从 0 开始计数，所以我们存的时候 +1，
