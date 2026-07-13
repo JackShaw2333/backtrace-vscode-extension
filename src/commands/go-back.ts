@@ -15,6 +15,10 @@ import { NavTree } from '../nav-tree';
 /** 注册后退命令 */
 export function registerGoBack(context: vscode.ExtensionContext, tree: NavTree): void {
   // registerCommand：把命令 ID 和回调函数绑定
+  // 回调是同步的（没有 async 关键字），为什么？
+  //   后退总是沿着 parent 链向上，每个节点只有一个 parent，
+  //   不需要用户做选择，所以直接执行跳转即可。
+  //   对比 goForward：可能有多个子节点，需要用户选，所以是 async。
   const disposable = vscode.commands.registerCommand('backtrace.goBack', () => {
     const target = tree.goBack();
 

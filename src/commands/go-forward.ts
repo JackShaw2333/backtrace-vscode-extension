@@ -5,13 +5,13 @@
  *
  * 行为：根据当前节点的子节点数量决定
  * - 0 个 → 提示"没有前进位置"
- * - 1 个 → 直接进入
- * - 多个 → 弹出 QuickPick 列表让用户选择
+ * - 1 个 → 直接进入（同步，无需用户选择）
+ * - 多个 → 弹出 QuickPick 列表让用户选择（异步，需要 await）
  *
- * async/await：
- *   showQuickPick 需要等待用户从列表中选一项，
- *   这是异步操作，需要用 await 等待结果。
- *   async 标记函数为"异步函数"，await 等待 Promise 完成。
+ * 为什么 goForward 有 async 而 goBack 没有？
+ *   导航树的特性：每个节点只有一个 parent（后退路径唯一），
+ *   但可以有多个 children（前进路径可能分叉）。
+ *   分叉时需要用户选 → showQuickPick 是异步的 → 需要 async/await。
  */
 
 import * as vscode from 'vscode';
@@ -20,7 +20,18 @@ import { navigateToNode } from './go-back';
 
 /** 注册前进命令 */
 export function registerGoForward(context: vscode.ExtensionContext, tree: NavTree): void {
-  // 这里的 async 表示回调函数是异步的
+  // 这里的 async 表示回调函数是异步的。
+  //
+  // 为什么 goForward 是 async 而 goBack 不是？
+  //   导航树的特性：每个节点只有一个 parent（后退路径唯一），
+  //   但可以有多个 children（前进路径可能分叉）。
+  //   当有多个子节点时，需要弹出 QuickPick 让用户选择去哪条分支。
+  //   showQuickPick 是异步的——它返回一个 Promise，在用户做出选择后才 resolve。
+  //   所以需要 async/await 来等待用户选择。
+  //
+  // 如果不用 async/await 会怎样？
+  //   showQuickPick 会立即返回（在用户选择之前），
+  //   picked 会是 undefined，后续代码无法正确执行。
   const disposable = vscode.commands.registerCommand('backtrace.goForward', async () => {
     const options = tree.getForwardOptions();
 
