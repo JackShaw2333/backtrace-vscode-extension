@@ -113,21 +113,17 @@ export class NavTree {
   }
 
   /**
-   * 获取"前进"选项列表。
+   * 获取当前节点的子节点列表（前进目标）。
    *
-   * 逻辑：
-   * - 如果当前节点有父节点（即不在树根），返回父节点的其他子节点（排除自己）。
-   *   为什么排除自己？因为"前进"应该去别的分支，不是原地不动。
-   * - 如果当前节点是树根，返回根的直接子节点。
+   * 为什么返回子节点而不是父节点的其他子节点（兄弟）？
+   *   "前进"的语义是"向更深层导航"，逻辑上应该进入子节点。
+   *   如果需要切换到同层其他分支，可以通过树视图直接点击。
    *
-   * .filter(c => c !== this.currentNode) 是数组的过滤方法，
-   * 返回的数组只包含满足箭头函数条件的元素。
+   * 如果当前节点是树根：返回根的直接子节点。
+   * 如果当前节点没有子节点：返回空数组。
    */
   getForwardOptions(): NavNode[] {
     if (!this.currentNode) return [];
-    if (this.currentNode.parent) {
-      return this.currentNode.parent.children.filter((c) => c !== this.currentNode);
-    }
     return this.currentNode.children;
   }
 
