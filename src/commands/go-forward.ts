@@ -22,16 +22,24 @@ import { navigateToNode } from './go-back';
 export function registerGoForward(context: vscode.ExtensionContext, tree: NavTree): void {
   // 这里的 async 表示回调函数是异步的。
   //
-  // 为什么 goForward 是 async 而 goBack 不是？
-  //   导航树的特性：每个节点只有一个 parent（后退路径唯一），
-  //   但可以有多个 children（前进路径可能分叉）。
-  //   当有多个子节点时，需要弹出 QuickPick 让用户选择去哪条分支。
-  //   showQuickPick 是异步的——它返回一个 Promise，在用户做出选择后才 resolve。
-  //   所以需要 async/await 来等待用户选择。
+  // 为什么分支选择必须等用户响应就要用异步？
   //
-  // 如果不用 async/await 会怎样？
-  //   showQuickPick 会立即返回（在用户选择之前），
-  //   picked 会是 undefined，后续代码无法正确执行。
+  // JavaScript 是单线程 + 事件循环模型：
+  //   所有代码和 UI 渲染都在同一个线程上运行。
+  //   如果 showQuickPick 是"同步等待"（阻塞），
+  //   它会卡住这个线程 → UI 无法渲染 → 用户看不到 QuickPick → 永远点不了 → 死锁。
+  //
+  // 所以 showQuickPick 被设计为异步 API：
+  //   ① 调用时，VSCode 弹出选择框，函数立即返回（不阻塞）
+  //   ② JavaScript 继续执行后面的代码（如果有的话）
+  //   ③ 用户做出选择后，Promise resolve，await 后面的代码才执行
+  //
+  // 类比：去餐厅吃饭
+  //   同步 = 站在柜台等厨师做完（阻塞，什么都不能干）
+  //   异步 = 拿号回座等叫号（不阻塞，可以刷手机，号到了再去取餐）
+  //
+  // 为什么 goBack 不需要 async？
+  //   后退直接执行跳转，不需要用户选择，没有"等待"环节。
   const disposable = vscode.commands.registerCommand('backtrace.goForward', async () => {
     const options = tree.getForwardOptions();
 
