@@ -104,9 +104,11 @@ export function registerGoForward(context: vscode.ExtensionContext, tree: NavTre
         return;
       }
       default: {
-        // 未知模式（可能是未来添加的但未处理的新值）→ 静默忽略
-        // 可以用 console.warn 记录，但不影响用户体验
-        console.warn('Backtrace: unknown forwardBehavior:', config.forwardBehavior);
+        // 如果 ForwardBehavior 新增了值但没有在 switch 中处理，
+        // 下一行的赋值会报编译错误（'string' is not assignable to 'never'），
+        // 这样在编译阶段就能发现未处理的分支。
+        const _exhaustive: never = config.forwardBehavior;
+        console.warn('Backtrace: unknown forwardBehavior:', _exhaustive);
         return;
       }
     }
