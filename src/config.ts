@@ -20,7 +20,7 @@
  */
 
 import * as vscode from 'vscode';
-import { CONFIG_NAMESPACE, DEFAULT_TRACKED_COMMANDS, FORWARD_BEHAVIOR_KEY, DEFAULT_FORWARD_BEHAVIOR } from './constants';
+import { CONFIG_NAMESPACE, DEFAULT_TRACKED_COMMANDS, FORWARD_BEHAVIOR_KEY, DEFAULT_FORWARD_BEHAVIOR, ForwardBehavior } from './constants';
 
 // ═══════════════════════════════════════════════════════════════
 //  BacktraceConfig —— "配置长什么样"的蓝图
@@ -80,7 +80,7 @@ export interface BacktraceConfig {
    * 'notification' → 状态栏提示有多个前进位置，用户通过 UI 选择（默认）
    * 'quickpick'    → 弹出 QuickPick 列表让用户选择
    */
-  forwardBehavior: 'notification' | 'quickpick';
+  forwardBehavior: ForwardBehavior;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -141,7 +141,7 @@ export function readConfig(): BacktraceConfig {
     // 读 backtrace.forwardBehavior
     // <'notification' | 'quickpick'> 是字面量联合类型
     // 第二个参数 DEFAULT_FORWARD_BEHAVIOR 是 'notification'，作为默认值
-    forwardBehavior: cfg.get<'notification' | 'quickpick'>(
+    forwardBehavior: cfg.get<ForwardBehavior>(
       FORWARD_BEHAVIOR_KEY,
       DEFAULT_FORWARD_BEHAVIOR,
     ),

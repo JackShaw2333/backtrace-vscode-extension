@@ -61,44 +61,54 @@ export function registerGoForward(context: vscode.ExtensionContext, tree: NavTre
     // 多个选项 → 根据用户设置决定行为
     const config = readConfig();
 
-    if (config.forwardBehavior === 'notification') {
-      // notification 模式（默认）：状态栏提示 + 引导用户使用 UI
-      // 用户可以通过侧边栏 Backtrace Tree 或底部 Stack 面板选择目标分支
-      // 提示中同时告知用户可在设置中修改行为
-      vscode.window.setStatusBarMessage(
-        '$(arrow-right) Backtrace: ' +
-          options.length +
-          ' forward locations available — use Backtrace Tree sidebar. ' +
-          '(Change via backtrace.forwardBehavior in settings)',
-        5000,
-      );
-      return;
-    }
+    // switch 比 if/else 更适合有多个枚举值的分支。
+    // 加上 default 分支确保即使未来新增了模式也不会静默走错路径。
+    switch (config.forwardBehavior) {
+      case 'notification': {
+        // notification 模式（默认）：状态栏提示 + 引导用户使用 UI
+        // 用户可以通过侧边栏 Backtrace Tree 或底部 Stack 面板选择目标分支
+        // 提示中同时告知用户可在设置中修改行为
+        vscode.window.setStatusBarMessage(
+          '$(arrow-right) Backtrace: ' +
+            options.length +
+            ' forward locations available — use Backtrace Tree sidebar. ' +
+            '(Change via backtrace.forwardBehavior in settings)',
+          5000,
+        );
+        return;
+      }
+      case 'quickpick': {
+        // quickpick 模式：弹出选择框让用户选择
+        // "& { index: number }" 是 TypeScript 的交叉类型（Intersection Type），
+        // 意思是在 QuickPickItem 的基础上额外加一个 index 属性。
+        const items: (vscode.QuickPickItem & { index: number })[] = options.map((node, index) => {
+          const uri = vscode.Uri.parse(node.uri);
+          const fileName = uri.path.split('/').pop() || uri.path;
+          return {
+            label: `$(symbol-method) ${node.symbolName || '(symbol)'}`,
+            description: `${fileName}:${node.line}`,
+            detail: uri.path,
+            index,
+          };
+        });
 
-    // quickpick 模式：弹出选择框让用户选择
-    // "& { index: number }" 是 TypeScript 的交叉类型（Intersection Type），
-    // 意思是在 QuickPickItem 的基础上额外加一个 index 属性。
-    // 为什么需要 index？用户选完后需要知道选的是第几个选项。
-    const items: (vscode.QuickPickItem & { index: number })[] = options.map((node, index) => {
-      const uri = vscode.Uri.parse(node.uri);
-      const fileName = uri.path.split('/').pop() || uri.path;
-      return {
-        label: `$(symbol-method) ${node.symbolName || '(symbol)'}`,
-        description: `${fileName}:${node.line}`,
-        detail: uri.path,
-        index, // 自定义属性：记录选项在数组中的位置
-      };
-    });
+        const picked = await vscode.window.showQuickPick(items, {
+          placeHolder: 'Choose a forward navigation target',
+        });
 
-    // await 暂停函数执行，直到用户做出选择
-    const picked = await vscode.window.showQuickPick(items, {
-      placeHolder: 'Choose a forward navigation target',
-    });
-
-    if (picked) {
-      tree.goForward(picked.index);
-      navigateToNode(options[picked.index]);
-      vscode.commands.executeCommand('backtrace._treeChanged');
+        if (picked) {
+          tree.goForward(picked.index);
+          navigateToNode(options[picked.index]);
+          vscode.commands.executeCommand('backtrace._treeChanged');
+        }
+        return;
+      }
+      default: {
+        // 未知模式（可能是未来添加的但未处理的新值）→ 静默忽略
+        // 可以用 console.warn 记录，但不影响用户体验
+        console.warn('Backtrace: unknown forwardBehavior:', config.forwardBehavior);
+        return;
+      }
     }
   });
 
