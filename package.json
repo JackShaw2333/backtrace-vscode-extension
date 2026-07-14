@@ -63,6 +63,19 @@
           "type": "boolean",
           "default": true,
           "description": "Persist navigation tree across VSCode sessions"
+        },
+        "backtrace.forwardBehavior": {
+          "type": "string",
+          "default": "notification",
+          "enum": [
+            "notification",
+            "quickpick"
+          ],
+          "enumDescriptions": [
+            "Show a status bar message when multiple forward options are available — use the Tree sidebar to navigate",
+            "Show a QuickPick list to choose from multiple forward options immediately"
+          ],
+          "description": "How to handle multiple forward navigation targets"
         }
       }
     },

@@ -43,6 +43,15 @@ export const CURSOR_STABILIZE_DELAY_MS = 120;
 /** VSCode 设置项的名字空间前缀。所有 backtrace.* 设置都在这个命名空间下 */
 export const CONFIG_NAMESPACE = 'backtrace';
 
+/** 前进行为设置键名。对应 package.json 中的 backtrace.forwardBehavior */
+export const FORWARD_BEHAVIOR_KEY = 'forwardBehavior';
+
+/** 前进行为默认值：状态栏通知（不弹 QuickPick） */
+export const DEFAULT_FORWARD_BEHAVIOR: 'notification' = 'notification';
+
+/** 前进行为可选值 */
+export type ForwardBehavior = 'notification' | 'quickpick';
+
 /** 在 VSCode 的 globalState（持久化存储）中保存导航树的键名 */
 export const PERSISTENCE_KEY = 'backtrace.navTree';
 

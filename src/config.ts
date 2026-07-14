@@ -20,7 +20,7 @@
  */
 
 import * as vscode from 'vscode';
-import { CONFIG_NAMESPACE, DEFAULT_TRACKED_COMMANDS } from './constants';
+import { CONFIG_NAMESPACE, DEFAULT_TRACKED_COMMANDS, FORWARD_BEHAVIOR_KEY, DEFAULT_FORWARD_BEHAVIOR } from './constants';
 
 // ═══════════════════════════════════════════════════════════════
 //  BacktraceConfig —— "配置长什么样"的蓝图
@@ -73,6 +73,14 @@ export interface BacktraceConfig {
    * 类型是 boolean（布尔值），要么 true 要么 false。
    */
   persistHistory: boolean;
+
+  /**
+   * 多分支前进时的行为模式。
+   *
+   * 'notification' → 状态栏提示有多个前进位置，用户通过 UI 选择（默认）
+   * 'quickpick'    → 弹出 QuickPick 列表让用户选择
+   */
+  forwardBehavior: 'notification' | 'quickpick';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -129,6 +137,14 @@ export function readConfig(): BacktraceConfig {
     // <boolean> 告诉 TypeScript 返回的是布尔值
     // 默认值 true
     persistHistory: cfg.get<boolean>('persistHistory', true),
+
+    // 读 backtrace.forwardBehavior
+    // <'notification' | 'quickpick'> 是字面量联合类型
+    // 第二个参数 DEFAULT_FORWARD_BEHAVIOR 是 'notification'，作为默认值
+    forwardBehavior: cfg.get<'notification' | 'quickpick'>(
+      FORWARD_BEHAVIOR_KEY,
+      DEFAULT_FORWARD_BEHAVIOR,
+    ),
   };
   // 最终返回的对象就像这样：
   // {
@@ -159,3 +175,4 @@ export function readConfig(): BacktraceConfig {
 //             → CommandWatcher：用 trackedCommands 过滤命令
 //             → NavTree：用 maxTreeDepth 限制深度
 //             → NavTree：用 persistHistory 决定是否存盘
+//             → goForward：用 forwardBehavior 决定多分支时弹 QuickPick 还是通知
