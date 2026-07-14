@@ -47,7 +47,7 @@ export const CONFIG_NAMESPACE = 'backtrace';
 export const FORWARD_BEHAVIOR_KEY = 'forwardBehavior';
 
 /** 前进行为默认值：状态栏通知（不弹 QuickPick） */
-export const DEFAULT_FORWARD_BEHAVIOR: 'notification' = 'notification';
+export const DEFAULT_FORWARD_BEHAVIOR = 'notification' as const;
 
 /** 前进行为可选值 */
 export type ForwardBehavior = 'notification' | 'quickpick';
