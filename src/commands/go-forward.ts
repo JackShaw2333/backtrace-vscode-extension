@@ -6,7 +6,9 @@
  * 行为：根据当前节点的子节点数量决定
  * - 0 个 → 提示"没有前进位置"
  * - 1 个 → 直接进入（同步，无需用户选择）
- * - 多个 → 弹出 QuickPick 列表让用户选择（异步，需要 await）
+ * - 多个 → 取决于 backtrace.forwardBehavior 设置：
+ *     'notification'（默认）→ 状态栏提示，用户通过 UI 选择
+ *     'quickpick'           → 弹出 QuickPick 列表让用户选择（异步，需要 await）
  *
  * 为什么 goForward 有 async 而 goBack 没有？
  *   导航树的特性：每个节点只有一个 parent（后退路径唯一），
@@ -17,6 +19,7 @@
 import * as vscode from 'vscode';
 import { NavTree } from '../nav-tree';
 import { navigateToNode } from './go-back';
+import { readConfig } from '../config';
 
 /** 注册前进命令 */
 export function registerGoForward(context: vscode.ExtensionContext, tree: NavTree): void {
@@ -55,7 +58,24 @@ export function registerGoForward(context: vscode.ExtensionContext, tree: NavTre
       return;
     }
 
-    // 多个选项 → 弹出选择框
+    // 多个选项 → 根据用户设置决定行为
+    const config = readConfig();
+
+    if (config.forwardBehavior === 'notification') {
+      // notification 模式（默认）：状态栏提示 + 引导用户使用 UI
+      // 用户可以通过侧边栏 Backtrace Tree 或底部 Stack 面板选择目标分支
+      // 提示中同时告知用户可在设置中修改行为
+      vscode.window.setStatusBarMessage(
+        '$(arrow-right) Backtrace: ' +
+          options.length +
+          ' forward locations available — use Backtrace Tree sidebar. ' +
+          '(Change via backtrace.forwardBehavior in settings)',
+        5000,
+      );
+      return;
+    }
+
+    // quickpick 模式：弹出选择框让用户选择
     // "& { index: number }" 是 TypeScript 的交叉类型（Intersection Type），
     // 意思是在 QuickPickItem 的基础上额外加一个 index 属性。
     // 为什么需要 index？用户选完后需要知道选的是第几个选项。
