@@ -179,9 +179,9 @@ body { font-family: var(--vscode-font-family); font-size: 13px; padding: 8px; ma
 .stack-row:hover { background: var(--vscode-list-hoverBackground); }
 .stack-row.current { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 .file-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.func-path { font-weight: 600; }
-.file-at { color: var(--vscode-textPreformat-foreground); margin-left: auto; }
-.badge { font-weight: bold; }
+.func-path { font-weight: 600; margin-right: 6px; }
+.file-at { color: var(--vscode-textPreformat-foreground); }
+.badge { font-weight: bold; margin-left: auto; }
 .empty { color: var(--vscode-disabledForeground); padding: 16px; text-align: center; }
 </style>
 </head>
