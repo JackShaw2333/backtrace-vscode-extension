@@ -74,14 +74,16 @@
       "explorer": [
         {
           "id": "backtraceTree",
-          "name": "Backtrace Tree"
+          "name": "Backtrace Tree",
+          "icon": "$(list-tree)"
         }
       ],
       "backtrace": [
         {
           "id": "backtraceStack",
           "name": "Backtrace Stack",
-          "type": "webview"
+          "type": "webview",
+          "icon": "$(list-tree)"
         }
       ]
     },
