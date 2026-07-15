@@ -104,7 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // 8. 启动命令监听器
   commandWatcher = new CommandWatcher(tree);
-  commandWatcher.activate(config, context);
+  commandWatcher.activate(config);
 
   // 9. 监听 VSCode 设置变化
   //    当用户修改 backtrace.* 设置时，自动重新加载配置。
@@ -115,7 +115,7 @@ export function activate(context: vscode.ExtensionContext) {
         const newConfig = readConfig();
         tree.maxDepth = newConfig.maxTreeDepth;
         commandWatcher.deactivate();
-        commandWatcher.activate(newConfig, context);
+        commandWatcher.activate(newConfig);
       }
     }),
   );

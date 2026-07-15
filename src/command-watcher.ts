@@ -44,7 +44,7 @@ export class CommandWatcher {
    * event.kind === Command 过滤出命令触发的跳转（F12/Ctrl+Click 等），
    * 排除鼠标点击（Mouse）和键盘方向键（Keyboard）。
    */
-  activate(config: BacktraceConfig, _context: vscode.ExtensionContext): void {
+  activate(config: BacktraceConfig): void {
     this.config = config;
 
     this.disposable = vscode.window.onDidChangeTextEditorSelection((event) => {
