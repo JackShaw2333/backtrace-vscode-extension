@@ -1,4 +1,5 @@
 /// <reference types="mocha" />
+/// <reference types="node" />
 
 import * as assert from 'assert';
 import { NavTree } from '../nav-tree';
