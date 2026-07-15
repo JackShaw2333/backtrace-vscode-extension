@@ -62,9 +62,12 @@ export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
     // description：标题右边的灰色文字，显示文件名:行号
     item.description = `${this.shortFileName(element.uri)}:${element.line}`;
 
-    // color：标题的颜色。这个属性不是公开 API，
-    // 所以用 (item as any) 跳过 TypeScript 的类型检查
+    // color：标题的颜色。这个属性在 @types/vscode 中没有声明，
+    // 但 VSCode 运行时支持 TreeItem.color。
+    // 用 eslint-disable-next-line 绕过 no-explicit-any 检查，
+    // 比 (item as any) 更安全——只禁用这一行，不会影响其他代码。
     const colorIndex = this.getFileColorIndex(element.uri);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
 
     // iconPath：节点图标。当前节点用箭头，其他用函数图标
