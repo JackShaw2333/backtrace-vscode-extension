@@ -21,6 +21,7 @@ import { NavTree } from './nav-tree';
 import { BacktraceConfig } from './config';
 import { CURSOR_STABILIZE_DELAY_MS } from './constants';
 import { getNodeContext } from './symbol-utils';
+import { isInternalNav } from './commands/navigate';
 
 /** 暂存的跳转信息（等待防抖确认） */
 interface PendingCapture {
@@ -35,25 +36,34 @@ export class CommandWatcher {
   private disposable: vscode.Disposable | null = null;
   private pending: PendingCapture | null = null;
   private config!: BacktraceConfig;
+  /** 内部导航发生的时间戳，用于甄别选择变化是否来自扩展自身 */
+  private internalNavAt: number = 0;
 
   constructor(private tree: NavTree) {}
 
   /**
-   * 开始监听。
-   *
-   * 用 onDidChangeTextEditorSelection 替代不存在的 onDidExecuteCommand。
-   * event.kind === Command 过滤出命令触发的跳转（F12/Ctrl+Click 等），
-   * 排除鼠标点击（Mouse）和键盘方向键（Keyboard）。
+   * 记录一次内部导航的时间戳。
+   * navigateToNode 执行前会设置 isInternalNav 标志，
+   * 此方法记录当前时间，供事件处理器判断。
    */
+  markInternalNav(): void {
+    this.internalNavAt = Date.now();
+  }
+
   activate(config: BacktraceConfig): void {
     this.config = config;
 
     this.disposable = vscode.window.onDidChangeTextEditorSelection((event) => {
-      // event.kind === undefined 表示编程式光标移动（由 goBack/goForward/tree-click 等触发），
-      // 应当忽略，否则会创建重复的导航节点（自循环 bug）。
+      // ── 判断是否来自扩展自身的导航 ──
+      // 如果 isInternalNav 标志在 300ms 内被设置过，
+      // 说明本次选择变化是由 navigateToNode（树点击/堆栈点击/后退/前进）触发的，
+      // 应当忽略，不记录到导航树。
+      if (isInternalNav || Date.now() - this.internalNavAt < 300) {
+        this.internalNavAt = 0;
+        return;
+      }
+
       if (event.kind === undefined) return;
-      // event.kind === Command 是真正的导航命令（F12/Ctrl+Click 等）
-      // 排除鼠标点击（Mouse）和键盘方向键（Keyboard）
       if (event.kind !== vscode.TextEditorSelectionChangeKind.Command) return;
 
       const editor = vscode.window.activeTextEditor;

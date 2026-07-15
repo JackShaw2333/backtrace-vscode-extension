@@ -8,6 +8,12 @@
 import * as vscode from 'vscode';
 
 /**
+ * 内部导航标志。
+ * navigateToNode 执行前设为 true，CommandWatcher 检测到后忽略本次选择变化。
+ */
+export let isInternalNav = false;
+
+/**
  * 跳转到指定位置（文件 + 行列）。
  *
  * 类型定义 { uri: string; line: number; column: number } 只要求三个必要属性，
@@ -17,6 +23,12 @@ import * as vscode from 'vscode';
  */
 export function navigateToNode(node: { uri: string; line: number; column: number }): void {
   const uri = vscode.Uri.parse(node.uri);
+
+  // showTextDocument 会触发 onDidChangeTextEditorSelection，
+  // 设置标志让 CommandWatcher 知道这是内部导航，不要记录跳转。
+  // 200ms 后自动清除，不影响后续用户操作。
+  isInternalNav = true;
+  setTimeout(() => { isInternalNav = false; }, 200);
 
   // openTextDocument 返回 Promise（异步操作：读取文件需要时间）
   vscode.workspace.openTextDocument(uri).then(
