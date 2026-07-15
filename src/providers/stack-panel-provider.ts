@@ -157,14 +157,13 @@ export class BacktraceStackProvider implements vscode.WebviewViewProvider {
     const rows = path
       .map((node, index) => {
         const color = this.getFileColor(node.uri);
-        const fileName = this.shortFileName(node.uri);
+        const display = node.contextName || node.symbolName || '(root)';
         const isCurrent = index === path.length - 1;
         return `
                 <div class="stack-row ${isCurrent ? 'current' : ''}" data-index="${index}">
                     <span class="file-color" style="background:${color}"></span>
-                    <span class="file-name">${this.escapeHtml(fileName)}</span>
-                    <span class="line-num">:${node.line}</span>
-                    <span class="symbol-name">${this.escapeHtml(node.symbolName || '')}</span>
+                    <span class="func-path">${this.escapeHtml(display)}</span>
+                    <span class="file-at">@ ${this.escapeHtml(this.shortFileName(node.uri))}:${node.line}</span>
                     ${isCurrent ? '<span class="badge">←</span>' : ''}
                 </div>`;
       })
@@ -180,9 +179,8 @@ body { font-family: var(--vscode-font-family); font-size: 13px; padding: 8px; ma
 .stack-row:hover { background: var(--vscode-list-hoverBackground); }
 .stack-row.current { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 .file-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.file-name { font-weight: 600; }
-.line-num { color: var(--vscode-textPreformat-foreground); }
-.symbol-name { color: var(--vscode-textLink-foreground); margin-left: auto; }
+.func-path { font-weight: 600; }
+.file-at { color: var(--vscode-textPreformat-foreground); margin-left: auto; }
 .badge { font-weight: bold; }
 .empty { color: var(--vscode-disabledForeground); padding: 16px; text-align: center; }
 </style>
