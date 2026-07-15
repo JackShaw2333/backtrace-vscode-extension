@@ -3,3 +3,4 @@ out/
 *.vsix
 .superpowers/
 .reasonix/
+docs/
