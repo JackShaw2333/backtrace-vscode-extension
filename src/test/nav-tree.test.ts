@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import { NavTree } from '../nav-tree';
+import { readConfig } from '../config';
 
 suite('NavTree', () => {
   test('addJump creates a child under root on first call', () => {
@@ -126,9 +127,60 @@ suite('NavTree', () => {
     tree.addJump('a.ts', 1, 1, 'a');
     const serialized = tree.serialize();
     assert.strictEqual(serialized.nodes.length, 1);
-
     const tree2 = new NavTree(50);
     tree2.deserialize(serialized);
     assert.strictEqual(tree2.root?.symbolName, 'a');
+  });
+
+  // ── removeNode 测试 ──────────────────────────────────
+  test('removeNode deletes root and clears tree', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.removeNode(tree.root!);
+    assert.strictEqual(tree.root, null);
+    assert.strictEqual(tree.currentNode, null);
+  });
+
+  test('removeNode falls back to parent when deleting current node', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.addJump('b.ts', 2, 1, 'b');
+    tree.removeNode(tree.currentNode!);
+    assert.strictEqual(tree.currentNode?.symbolName, 'a');
+  });
+
+  test('removeNode deletes branch without affecting other branches', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.addJump('b.ts', 2, 1, 'b');
+    tree.goBack();
+    tree.addJump('c.ts', 3, 1, 'c');
+    const bNode = tree.root!.children[0];
+    tree.removeNode(bNode);
+    assert.strictEqual(tree.root!.children.length, 1);
+    assert.strictEqual(tree.root!.children[0].symbolName, 'c');
+  });
+
+  test('removeNode leaf at root keeps current node', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.addJump('b.ts', 2, 1, 'b');
+    tree.goBack();
+    tree.removeNode(tree.root!.children[0]);
+    assert.strictEqual(tree.currentNode?.symbolName, 'a');
+    assert.strictEqual(tree.root!.children.length, 0);
+  });
+
+  // ── 多分支前进测试 ──────────────────────────────────
+  test('goForward with multiple children at root', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.addJump('b.ts', 2, 1, 'b');
+    tree.goBack();
+    tree.addJump('c.ts', 3, 1, 'c');
+    tree.goBack();
+    assert.strictEqual(tree.getForwardOptions().length, 2);
+    tree.goForward(0);
+    assert.strictEqual(tree.currentNode?.symbolName, 'b');
   });
 });

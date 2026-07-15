@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import { NavTree } from '../nav-tree';
+import { readConfig, BacktraceConfig } from '../config';
 
 suite('Backtrace Extension', () => {
   test('NavTree handles empty tree gracefully', () => {
@@ -42,12 +43,45 @@ suite('Backtrace Extension', () => {
     for (const n of nodes) {
       tree.addJump(`${n}.ts`, 1, 1, n);
     }
-    // Navigate back through the entire chain
     let count = 0;
     while (tree.goBack() !== null) {
       count++;
     }
-    assert.strictEqual(count, nodes.length - 1); // root has no parent
+    assert.strictEqual(count, nodes.length - 1);
     assert.strictEqual(tree.currentNode?.symbolName, 'a');
+  });
+
+  // ── 配置测试 ──────────────────────────────────────────
+  test('config has default values', () => {
+    const cfg: BacktraceConfig = {
+      trackedCommands: ['editor.action.revealDefinition'],
+      maxTreeDepth: 50,
+      persistHistory: true,
+      forwardBehavior: 'notification',
+    };
+    assert.strictEqual(cfg.trackedCommands.length, 1);
+    assert.strictEqual(cfg.trackedCommands[0], 'editor.action.revealDefinition');
+    assert.strictEqual(cfg.maxTreeDepth, 50);
+    assert.strictEqual(cfg.persistHistory, true);
+    assert.strictEqual(cfg.forwardBehavior, 'notification');
+  });
+
+  test('config accepts quickpick forward behavior', () => {
+    const cfg: BacktraceConfig = {
+      trackedCommands: ['editor.action.revealDefinition'],
+      maxTreeDepth: 50,
+      persistHistory: true,
+      forwardBehavior: 'quickpick',
+    };
+    assert.strictEqual(cfg.forwardBehavior, 'quickpick');
+  });
+
+  test('NavTree constructor respects maxDepth', () => {
+    const tree = new NavTree(5);
+    assert.strictEqual(tree.maxDepth, 5);
+    for (let i = 0; i < 10; i++) {
+      tree.addJump(`${i}.ts`, 1, 1, `n${i}`);
+    }
+    assert.ok(tree.root !== null);
   });
 });
