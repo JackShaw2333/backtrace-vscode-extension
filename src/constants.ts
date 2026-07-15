@@ -52,7 +52,7 @@ export const DEFAULT_FORWARD_BEHAVIOR = 'notification' as const;
 /** 前进行为可选值 */
 export type ForwardBehavior = 'notification' | 'quickpick';
 
-/** 在 VSCode 的 globalState（持久化存储）中保存导航树的键名 */
+/** 在 VSCode 的 workspaceState（按 workspace 隔离的存储）中保存导航树的键名 */
 export const PERSISTENCE_KEY = 'backtrace.navTree';
 
 /**

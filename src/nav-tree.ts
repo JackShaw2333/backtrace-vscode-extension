@@ -168,6 +168,38 @@ export class NavTree {
   }
 
   /**
+   * 删除一个节点及其所有子节点（整个子树）。
+   *
+   * 为什么需要这个方法？用户可以在右键菜单中删除不需要的导航记录。
+   *
+   * 删除后 currentNode 的处理：
+   *   - 如果删除的是 currentNode 本身或其子节点 → currentNode 上移一层
+   *   - 如果删除的是其他分支 → currentNode 不变
+   *
+   * @param target 要删除的节点
+   */
+  removeNode(target: NavNode): void {
+    if (target === this.root) {
+      this.root = null;
+      this.currentNode = null;
+      return;
+    }
+    if (target.parent) {
+      const idx = target.parent.children.indexOf(target);
+      if (idx !== -1) target.parent.children.splice(idx, 1);
+    }
+    // 如果当前节点是被删除节点或其后代 → 回退到父节点
+    let node: NavNode | null = this.currentNode;
+    while (node) {
+      if (node === target) {
+        this.currentNode = target.parent;
+        return;
+      }
+      node = node.parent;
+    }
+  }
+
+  /**
    * 递归计算节点深度。
    * 为什么用递归？树的结构天然适合递归（每个子树都是一棵树）。
    * 没有子节点的节点深度为 0。

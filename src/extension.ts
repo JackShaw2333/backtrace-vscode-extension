@@ -21,6 +21,7 @@ import { readConfig } from './config';
 import { PERSISTENCE_KEY } from './constants';
 import { registerGoBack } from './commands/go-back';
 import { registerGoForward } from './commands/go-forward';
+import { registerDeleteNode } from './commands/delete-node';
 import { BacktraceTreeProvider, registerJumpCommand } from './providers/tree-data-provider';
 import { BacktraceStackProvider } from './providers/stack-panel-provider';
 
@@ -37,7 +38,7 @@ let stackProvider: BacktraceStackProvider;
  *
  * context 参数由 VSCode 注入，包含：
  *   - subscriptions: 放 disposable 对象的数组，扩展停用时自动全部清理
- *   - globalState: 全局键值对存储（JSON 化对象），类似浏览器的 localStorage
+ *   - workspaceState: 按 workspace 隔离的键值对存储，不同项目的数据互不干扰
  *   - extensionUri: 扩展文件所在的目录路径
  */
 export function activate(context: vscode.ExtensionContext) {
@@ -48,12 +49,12 @@ export function activate(context: vscode.ExtensionContext) {
   const tree = new NavTree(config.maxTreeDepth);
 
   // 3. 从保存的数据恢复导航树（如果启用了持久化）
-  //    globalState 的数据在 VSCode 重启后保留。
+  //    workspaceState 的数据按 workspace 隔离，不同项目不共享。
   //    为什么用 get<ReturnType<typeof tree.serialize>>？
   //    这是 TypeScript 的高级用法：获取 serialize() 的返回值类型。
   //    这样保证存储和读取的类型一致。
   if (config.persistHistory) {
-    const saved = context.globalState.get<ReturnType<typeof tree.serialize>>(PERSISTENCE_KEY);
+    const saved = context.workspaceState.get<ReturnType<typeof tree.serialize>>(PERSISTENCE_KEY);
     if (saved) {
       tree.deserialize(saved);
     }
@@ -73,7 +74,6 @@ export function activate(context: vscode.ExtensionContext) {
     stackProvider?.update();
 
     // 防抖（debounce）持久化：500ms 内只保存最后一次变化。
-    // 因为连续导航可能一秒跳转多次，每次都写入 globalState
     // 会影响性能。500ms 的缓冲足够了。
     //
     // 为什么不用 activate() 开头的 config.persistHistory？
@@ -82,7 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (!readConfig().persistHistory) return;
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
-      context.globalState.update(PERSISTENCE_KEY, tree.serialize());
+      context.workspaceState.update(PERSISTENCE_KEY, tree.serialize());
     }, 500);
   });
   context.subscriptions.push(persistHandler);
@@ -90,6 +90,7 @@ export function activate(context: vscode.ExtensionContext) {
   // 5. 注册导航命令
   registerGoBack(context, tree);
   registerGoForward(context, tree);
+  registerDeleteNode(context, tree);
   registerJumpCommand(context, tree);
 
   // 6. 注册侧边栏树视图
