@@ -16,27 +16,13 @@
  *   而不是普通的 string。这样类型更精确。
  */
 
-/** 所有预置的可追踪 VSCode 命令 ID */
-export const PRESET_COMMANDS = [
-  'editor.action.revealDefinition', // F12 / Ctrl+Click：转到定义
-  'editor.action.revealDeclaration', // 转到声明
-  'editor.action.goToTypeDefinition', // 转到类型定义
-  'editor.action.goToImplementation', // 转到实现
-  'editor.action.goToReferences', // 转到引用
-  'editor.action.peekDefinition', // 预览定义（不跳转，弹出浮窗）
-  'editor.action.peekImplementation', // 预览实现
-  'editor.action.peekReferences', // 预览引用
-] as const;
-
-/** 默认启用的命令（刚安装时只追踪"转到定义"，最常用的导航操作） */
-export const DEFAULT_TRACKED_COMMANDS: readonly string[] = ['editor.action.revealDefinition'];
-
 /**
  * 光标稳定等待时间（毫秒 = 0.12 秒）。
+ *
  * 为什么需要这个延迟？
- *   onDidExecuteCommand 触发时，光标还在"跳转前"的位置。
- *   命令执行后光标才会移动到"跳转后"的位置。
- *   所以需要等一小段时间让光标稳定，再获取目标位置。
+ *   onDidChangeTextEditorSelection 在光标移动后触发，
+ *   但 120ms 防抖可以过滤掉中间状态的快速连续跳转，
+ *   确保只记录最终稳定的导航位置。
  */
 export const CURSOR_STABILIZE_DELAY_MS = 120;
 

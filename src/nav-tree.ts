@@ -66,34 +66,31 @@ export class NavTree {
    * @returns 新创建的 NavNode
    */
   addJump(uri: string, line: number, column: number, symbolName: string): NavNode {
-    // 为什么用对象字面量创建？NavNode 是 interface（接口），不是 class，
-    // TypeScript 中 interface 只能用字面量或工厂函数创建。
     const node: NavNode = {
       uri,
       line,
       column,
       symbolName,
-      children: [], // 新节点还没有子节点，先给空数组
-      parent: null, // 还不确定父节点是谁，稍后设置
+      children: [],
+      parent: null,
       timestamp: Date.now(),
     };
 
     if (!this.root) {
-      // 树是空的 → 这个节点就是树根
-      // 为什么用 if (!this.root) 判断？因为 root 是 NavNode | null，
-      // JavaScript 中 null 转布尔值是 false，!false = true
       this.root = node;
       this.currentNode = node;
     } else if (this.currentNode) {
-      // 树非空 → 挂在 currentNode 下面
-      // 为什么用 .push()？因为 children 是数组，push 是数组方法
       node.parent = this.currentNode;
       this.currentNode.children.push(node);
-      // 把"当前节点"更新为新节点
+      this.currentNode = node;
+    } else {
+      // 树非空但 currentNode 为 null → 挂到 root 下，避免节点沦为孤儿
+      node.parent = this.root;
+      this.root!.children.push(node);
       this.currentNode = node;
     }
 
-    this.pruneIfExceeded(); // 加完节点后检查深度
+    this.pruneIfExceeded();
     return node;
   }
 
@@ -151,17 +148,13 @@ export class NavTree {
    */
   private pruneIfExceeded(): void {
     if (!this.root) return;
-    const depth = this.calcDepth(this.root);
-    if (depth <= this.maxDepth) return;
 
-    // 收集所有叶子，按时间戳从旧到新排序
-    const leaves: NavNode[] = [];
-    this.collectLeaves(this.root, leaves);
-    leaves.sort((a, b) => a.timestamp - b.timestamp);
-    const target = leaves[0];
-    if (target.parent) {
-      // .indexOf() 在数组中查找目标的位置
-      // .splice(idx, 1) 从数组删除一个元素
+    while (this.calcDepth(this.root) > this.maxDepth) {
+      const leaves: NavNode[] = [];
+      this.collectLeaves(this.root, leaves);
+      leaves.sort((a, b) => a.timestamp - b.timestamp);
+      const target = leaves[0];
+      if (!target.parent) break;
       const idx = target.parent.children.indexOf(target);
       if (idx !== -1) target.parent.children.splice(idx, 1);
     }
@@ -264,7 +257,7 @@ export class NavTree {
       symbolName: node.symbolName,
       timestamp: node.timestamp,
       parentIndex: node.parent ? (indexMap.get(node.parent) ?? null) : null,
-      childrenIndices: node.children.map((c) => indexMap.get(c)!).filter((i) => i !== undefined),
+      childrenIndices: node.children.map((c) => indexMap.get(c)).filter((i): i is number => i !== undefined),
     }));
 
     return {

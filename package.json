@@ -44,16 +44,6 @@
     "configuration": {
       "title": "Backtrace",
       "properties": {
-        "backtrace.trackedCommands": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [
-            "editor.action.revealDefinition"
-          ],
-          "description": "List of command IDs to track for navigation history"
-        },
         "backtrace.maxTreeDepth": {
           "type": "number",
           "default": 50,

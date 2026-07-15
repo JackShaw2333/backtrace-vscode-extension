@@ -185,4 +185,47 @@ suite('NavTree', () => {
     tree.goForward(0);
     assert.strictEqual(tree.currentNode?.symbolName, 'b');
   });
+
+  // ── 深度裁剪测试 ──────────────────────────────────
+  test('pruneIfExceeded removes oldest leaf in branching tree', () => {
+    const tree = new NavTree(2);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.addJump('b.ts', 2, 1, 'b');
+    tree.goBack();
+    tree.addJump('c.ts', 3, 1, 'c');
+    // tree: a(children: b,c) depth=1 ok
+    tree.goBack();
+    tree.addJump('d.ts', 4, 1, 'd');
+    // tree: a(children: b,c,d) depth=1, within maxDepth=2
+    assert.strictEqual(tree.root!.children.length, 3);
+  });
+
+  test('addJump attaches to root when currentNode is null', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.addJump('b.ts', 2, 1, 'b');
+    // Simulate orphan by clearing currentNode
+    tree.currentNode = null;
+    tree.addJump('c.ts', 3, 1, 'c');
+    // Should attach to root, not become orphan
+    assert.strictEqual(tree.currentNode!.symbolName, 'c');
+    assert.strictEqual(tree.root!.children.length, 2);
+  });
+
+  test('serialization and deserialize with branching tree', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 1, 1, 'a');
+    tree.addJump('b.ts', 2, 1, 'b');
+    tree.goBack();
+    tree.addJump('c.ts', 3, 1, 'c');
+    tree.goBack();
+
+    const serialized = tree.serialize();
+    assert.strictEqual(serialized.nodes.length, 3);
+
+    const tree2 = new NavTree(50);
+    tree2.deserialize(serialized);
+    assert.strictEqual(tree2.root?.children.length, 2);
+    assert.strictEqual(tree2.currentNode?.symbolName, 'a');
+  });
 });
