@@ -75,7 +75,11 @@ export function activate(context: vscode.ExtensionContext) {
     // 防抖（debounce）持久化：500ms 内只保存最后一次变化。
     // 因为连续导航可能一秒跳转多次，每次都写入 globalState
     // 会影响性能。500ms 的缓冲足够了。
-    if (!config.persistHistory) return;
+    //
+    // 为什么不用 activate() 开头的 config.persistHistory？
+    //   activate() 中的 config 是闭包捕获的旧值，用户修改设置后不会更新。
+    //   readConfig().persistHistory 每次动态读取，保证拿到最新值。
+    if (!readConfig().persistHistory) return;
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       context.globalState.update(PERSISTENCE_KEY, tree.serialize());
