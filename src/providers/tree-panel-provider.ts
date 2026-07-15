@@ -95,12 +95,12 @@ export class BacktraceTreePanelProvider implements vscode.WebviewViewProvider {
 
     let html = `
       <div class="stack-row ${isCurrent ? 'current' : ''}" style="padding-left:${indent + 8}px" data-idx='${idxAttr}'>
+        <span class="delete-btn" data-action="delete">&times;</span>
         <span class="file-color" style="background:${color}"></span>
         <span class="file-loc">${this.escapeHtml(fileName)}:${node.line}</span>
         <span class="func-path">${this.escapeHtml(display)}</span>
         <span class="spacer"></span>
         ${isCurrent ? '<span class="badge">\u2190</span>' : ''}
-        <span class="delete-btn" data-action="delete">\u{1F5D1}</span>
       </div>`;
 
     // 递归渲染子节点
