@@ -73,6 +73,10 @@ export function activate(context: vscode.ExtensionContext) {
     treeProvider?.refresh();
     stackProvider?.update();
 
+    // 更新"空树"上下文变量，控制 viewsWelcome 帮助文字的显示/隐藏。
+    // setContext 只在 activate() 时执行一次，后续树变化时需要同步更新。
+    vscode.commands.executeCommand('setContext', 'backtrace.isEmpty', !tree.root);
+
     // 防抖（debounce）持久化：500ms 内只保存最后一次变化。
     // 会影响性能。500ms 的缓冲足够了。
     //
