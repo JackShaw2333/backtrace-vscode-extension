@@ -45,15 +45,7 @@ export class BacktraceStackProvider implements vscode.WebviewViewProvider {
    */
   private _view?: vscode.WebviewView;
 
-  /**
-   * @param extensionUri 扩展所在目录的 URI。
-   *   为什么需要？如果以后要加载 CSS/JS 资源文件，需要通过这个 URI 定位。
-   *   readonly 表示初始化后不能修改。
-   * @param tree 共享的导航树实例。
-   *   为什么存 tree？collectPath() 需要从 currentNode 反向收集路径。
-   */
   constructor(
-    private readonly extensionUri: vscode.Uri,
     private tree: NavTree,
   ) {}
 

@@ -16,13 +16,13 @@ suite('Backtrace Extension', () => {
   });
 
   test('NavTree prunes at maxDepth', () => {
-    const tree = new NavTree(3);
-    tree.addJump('a.ts', 1, 1, 'a'); // depth 0
-    tree.addJump('b.ts', 2, 1, 'b'); // depth 1
-    tree.addJump('c.ts', 3, 1, 'c'); // depth 2
-    tree.addJump('d.ts', 4, 1, 'd'); // depth 3 — triggers prune
+    const tree = new NavTree(2);
+    tree.addJump('a.ts', 1, 1, 'a');  // depth 0
+    tree.addJump('b.ts', 2, 1, 'b');  // depth 1
+    tree.addJump('c.ts', 3, 1, 'c');  // depth 2 — still <= maxDepth(2)
+    tree.addJump('d.ts', 4, 1, 'd');  // depth 3 — exceeds maxDepth, triggers prune
     assert.ok(tree.root !== null);
-    // After pruning from depth 3 back to maxDepth 3, root should still exist
+    // After prune, oldest leaf was removed but root stays
     assert.strictEqual(tree.currentNode?.symbolName, 'd');
   });
 

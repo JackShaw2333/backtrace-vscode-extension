@@ -48,29 +48,24 @@ export class CommandWatcher {
     this.config = config;
 
     this.disposable = vscode.window.onDidChangeTextEditorSelection((event) => {
-      // event.kind 可能为 undefined（例如通过 API 编程式修改），也视为 Command
-      if (event.kind !== undefined && event.kind !== vscode.TextEditorSelectionChangeKind.Command) {
-        return;
-      }
+      // event.kind === undefined 表示编程式光标移动（由 goBack/goForward/tree-click 等触发），
+      // 应当忽略，否则会创建重复的导航节点（自循环 bug）。
+      if (event.kind === undefined) return;
+      // event.kind === Command 是真正的导航命令（F12/Ctrl+Click 等）
+      // 排除鼠标点击（Mouse）和键盘方向键（Keyboard）
+      if (event.kind !== vscode.TextEditorSelectionChangeKind.Command) return;
 
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
 
-      const position = editor.selection.active;
-      const document = editor.document;
+      const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active);
+      const word = wordRange ? editor.document.getText(wordRange) : '';
 
-      // 获取光标处符号名
-      const wordRange = document.getWordRangeAtPosition(position);
-      const word = wordRange ? document.getText(wordRange) : '';
+      const uri = editor.document.uri.toString();
+      const line = editor.selection.active.line + 1;
+      const column = editor.selection.active.character + 1;
 
-      const uri = document.uri.toString();
-      const line = position.line + 1;
-      const column = position.character + 1;
-
-      // 防抖：取消上一次待确认的跳转
-      if (this.pending) {
-        clearTimeout(this.pending.timer);
-      }
+      if (this.pending) clearTimeout(this.pending.timer);
 
       const timer = setTimeout(() => {
         this.finalizeCapture(uri, line, column, word);
@@ -78,10 +73,6 @@ export class CommandWatcher {
 
       this.pending = { toUri: uri, toLine: line, toColumn: column, symbolName: word, timer };
     });
-
-    if (this.disposable) {
-      context.subscriptions.push(this.disposable);
-    }
   }
 
   deactivate(): void {

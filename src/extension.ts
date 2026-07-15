@@ -99,7 +99,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceTree', treeProvider));
 
   // 7. 注册底部堆栈面板
-  stackProvider = new BacktraceStackProvider(context.extensionUri, tree);
+  stackProvider = new BacktraceStackProvider(tree);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(BacktraceStackProvider.viewType, stackProvider));
 
   // 8. 启动命令监听器
