@@ -20,6 +20,7 @@ import * as vscode from 'vscode';
 import { NavTree } from './nav-tree';
 import { BacktraceConfig } from './config';
 import { CURSOR_STABILIZE_DELAY_MS } from './constants';
+import { getNodeContext } from './symbol-utils';
 
 /** 暂存的跳转信息（等待防抖确认） */
 interface PendingCapture {
@@ -85,12 +86,12 @@ export class CommandWatcher {
   }
 
   /** 120ms 防抖后确认跳转 */
-  private finalizeCapture(
+  private async finalizeCapture(
     toUri: string,
     toLine: number,
     toColumn: number,
     symbolName: string,
-  ): void {
+  ): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
 
@@ -101,7 +102,11 @@ export class CommandWatcher {
 
     // 位置与暂存时一致 → 跳转稳定，记录
     if (currentUri === toUri && currentLine === toLine && currentColumn === toColumn) {
-      this.tree.addJump(toUri, toLine, toColumn, symbolName);
+      // 异步获取所在函数/类上下文
+      const ctx = await getNodeContext(toUri, toLine, toColumn, symbolName);
+      const fileName = toUri.split('/').pop() || toUri;
+      console.log(`[Backtrace] Nav → ${ctx.contextName || ctx.symbolName}  @ ${fileName}:${toLine}`);
+      this.tree.addJump(toUri, toLine, toColumn, ctx.symbolName, ctx.contextName);
       vscode.commands.executeCommand('backtrace._treeChanged');
     }
   }

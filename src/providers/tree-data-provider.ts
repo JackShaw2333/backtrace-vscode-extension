@@ -67,7 +67,8 @@ export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
    */
   getTreeItem(element: NavNode): vscode.TreeItem {
     const isCurrent = element === this.tree.currentNode;
-    const item = new vscode.TreeItem(element.symbolName || '(root)');
+    const label = element.contextName ? `${element.contextName}${element.symbolName ? ' → ' + element.symbolName : ''}` : element.symbolName || '(root)';
+    const item = new vscode.TreeItem(label);
 
     // description：标题右边的灰色文字，显示文件名:行号
     item.description = `${this.shortFileName(element.uri)}:${element.line}`;

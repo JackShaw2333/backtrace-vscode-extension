@@ -129,7 +129,15 @@ export function activate(context: vscode.ExtensionContext) {
   //     为空时显示"帮助文字"引导用户使用。
   vscode.commands.executeCommand('setContext', 'backtrace.isEmpty', !tree.root);
 
-  console.log('Backtrace extension activated');
+  const restored = config.persistHistory && tree.root ? ` (${countNodes(tree.root)} nodes restored)` : '';
+  console.log(`[Backtrace] activated${restored}`);
+}
+
+/** 递归统计节点数（用于启动日志） */
+function countNodes(node: import('./nav-node').NavNode): number {
+  let count = 1;
+  for (const child of node.children) count += countNodes(child);
+  return count;
 }
 
 /** 扩展停用时的清理入口 */

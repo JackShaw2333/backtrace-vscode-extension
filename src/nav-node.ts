@@ -44,6 +44,14 @@ export interface NavNode {
   symbolName: string;
 
   /**
+   * 所在的函数/方法/类上下文路径。
+   * 例如 "AppComponent.ngOnInit" 表示在 AppComponent 的 ngOnInit 方法中。
+   * 通过 vscode.executeDocumentSymbolProvider 获取。
+   * 如果获取失败则为空字符串。
+   */
+  contextName: string;
+
+  /**
    * 子节点列表。
    * NavNode[] 是 TypeScript 数组类型，表示"由 NavNode 组成的数组"。
    * 为什么是数组？一个节点可能跳到多个不同的位置（例如从 A 跳到 B，
@@ -92,6 +100,7 @@ export interface SerializedNavNode {
   line: number;
   column: number;
   symbolName: string;
+  contextName: string;
 
   /**
    * 父节点在数组中的索引。

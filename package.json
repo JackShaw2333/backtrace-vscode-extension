@@ -113,8 +113,8 @@
       "view/item/context": [
         {
           "command": "backtrace.deleteNode",
-          "when": "view == backtraceTree && viewItem == node",
-          "group": "inline"
+          "when": "view == backtraceTree",
+          "group": "navigation"
         }
       ]
     }
