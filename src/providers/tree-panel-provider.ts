@@ -30,8 +30,8 @@ export class BacktraceTreePanelProvider implements vscode.WebviewViewProvider {
     this.update();
 
     webviewView.webview.onDidReceiveMessage((message) => {
-      if (message.command === 'jumpTo' && message.index !== undefined) {
-        const node = this.findNodeAtIndex(this.tree.root, message.indices || []);
+      if (message.command === 'jumpTo' && message.indices !== undefined) {
+        const node = this.findNodeAtIndex(this.tree.root, message.indices);
         if (node) {
           this.tree.currentNode = node;
           const uri = vscode.Uri.parse(node.uri);
@@ -44,8 +44,8 @@ export class BacktraceTreePanelProvider implements vscode.WebviewViewProvider {
           vscode.commands.executeCommand('backtrace._treeChanged');
         }
       }
-      if (message.command === 'deleteNode' && message.index !== undefined) {
-        const node = this.findNodeAtIndex(this.tree.root, message.indices || []);
+      if (message.command === 'deleteNode' && message.indices !== undefined) {
+        const node = this.findNodeAtIndex(this.tree.root, message.indices);
         if (node) {
           this.tree.removeNode(node);
           vscode.commands.executeCommand('backtrace._treeChanged');
