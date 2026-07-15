@@ -22,16 +22,16 @@ import { PERSISTENCE_KEY } from './constants';
 import { registerGoBack } from './commands/go-back';
 import { registerGoForward } from './commands/go-forward';
 import { registerDeleteNode } from './commands/delete-node';
-import { BacktraceTreeProvider, registerJumpCommand } from './providers/tree-data-provider';
-import { BacktraceStackProvider } from './providers/stack-panel-provider';
+import { BacktracePathProvider, registerJumpCommand } from './providers/path-provider';
+import { BacktraceTreePanelProvider } from './providers/tree-panel-provider';
 
 // 模块级变量：
 // 为什么放在函数外面？因为 deactivate() 也需要访问它们。
 // 在 activate() 中赋值，在 deactivate() 中清理。
 // 不能用 const，因为需要在 activate() 中赋值。
 let commandWatcher: CommandWatcher;
-let treeProvider: BacktraceTreeProvider;
-let stackProvider: BacktraceStackProvider;
+let pathProvider: BacktracePathProvider;
+let treeProvider: BacktraceTreePanelProvider;
 
 /**
  * VSCode 扩展激活入口。
@@ -67,11 +67,11 @@ export function activate(context: vscode.ExtensionContext) {
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
   const persistHandler = vscode.commands.registerCommand('backtrace._treeChanged', () => {
-    // ?. 可选链：treeProvider 和 stackProvider 在注册此命令的
+    // ?. 可选链：pathProvider 和 treeProvider 在注册此命令的
     // 时刻可能还没赋值（它们在后面几行才被赋值），
     // 但被调用时一定已经赋值了。?. 防止万一。
-    treeProvider?.refresh();
-    stackProvider?.update();
+    pathProvider?.refresh();
+    treeProvider?.update();
 
     // 更新"空树"上下文变量，控制 viewsWelcome 帮助文字的显示/隐藏。
     // setContext 只在 activate() 时执行一次，后续树变化时需要同步更新。
@@ -97,14 +97,14 @@ export function activate(context: vscode.ExtensionContext) {
   registerDeleteNode(context, tree);
   registerJumpCommand(context, tree);
 
-  // 6. 注册侧边栏树视图
+  // 6. 注册侧边栏路径视图
   //    'backtraceTree' 必须是 package.json 中注册的视图 ID
-  treeProvider = new BacktraceTreeProvider(tree);
-  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceTree', treeProvider));
+  pathProvider = new BacktracePathProvider(tree);
+  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceTree', pathProvider));
 
-  // 7. 注册底部堆栈面板
-  stackProvider = new BacktraceStackProvider(tree);
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider(BacktraceStackProvider.viewType, stackProvider));
+  // 7. 注册底部树视图面板
+  treeProvider = new BacktraceTreePanelProvider(tree);
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider(BacktraceTreePanelProvider.viewType, treeProvider));
 
   // 8. 启动命令监听器
   commandWatcher = new CommandWatcher(tree);

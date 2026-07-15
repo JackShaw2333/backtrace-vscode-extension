@@ -1,18 +1,10 @@
 /**
- * 侧边栏树视图（Explorer 中的 "Backtrace Tree"）。
+ * 侧边栏路径视图（Explorer 中的 "Backtrace Stack"）。
  *
- * 显示位置：左侧 Activity Bar → Explorer（资源管理器）→ 最下方 "Backtrace Tree" 区域
+ * 显示从根节点到当前节点的线性路径（类似堆栈回溯），
+ * 每层只展示一个子节点——朝向 currentNode 的那一个。
  *
- *   VSCode 布局参考：
- *     ┌─────────────┬────────────────────────┐
- *     │  ① Activity │  ② Side Bar           │
- *     │    Bar      │  ├─ Explorer           │
- *     │  (左侧图标  │  │  ├─ 文件列表        │
- *     │   栏)       │  │  └─ Backtrace Tree  ← 这里是本视图
- *     │    ·        │  ├─ Search             │
- *     │    ·        │  └─ ...               │
- *     └─────────────┴────────────────────────┘
- *       ③ Panel（底部面板）
+ * 显示位置：左侧 Activity Bar → Explorer → "Backtrace Stack" 区域
  *
  * TreeDataProvider 是 VSCode 的标准接口，有点像"翻译器"：
  *   把数据（NavNode）翻译成 VSCode 能显示的样子（TreeItem）。
@@ -24,7 +16,7 @@ import { NavNode } from '../nav-node';
 import { FILE_COLORS } from '../constants';
 import { navigateToNode } from '../commands/navigate';
 
-export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
+export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
   /**
    * _onDidChangeTreeData（事件发射器）：
    *   这是 VSCode 的机制：树内容变化时，调用 .fire() 发射事件，
@@ -105,11 +97,27 @@ export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
     return item;
   }
 
-  /** 获取子节点。element 是 undefined 时返回根节点（VSCode 的约定） */
+  /** 获取子节点。侧边栏只显示从根到当前的线性路径 */
   getChildren(element?: NavNode): NavNode[] {
     if (!this.tree.root) return [];
-    if (!element) return [this.tree.root];
-    return element.children;
+    if (!element) return [this.tree.root];  // 第一层：根节点
+    // 后续层：返回朝向 currentNode 方向的子节点（最多一个）
+    const next = this.childTowardCurrent(element);
+    return next ? [next] : [];
+  }
+
+  /**
+   * 在 element 的子节点中，找到"朝向 currentNode 方向"的那一个。
+   * 算法：从 currentNode 沿 parent 链上溯到 element 的层级，
+   * 返回那个子节点。
+   */
+  private childTowardCurrent(node: NavNode): NavNode | null {
+    let cur = this.tree.currentNode;
+    while (cur && cur.parent) {
+      if (cur.parent === node) return cur;
+      cur = cur.parent;
+    }
+    return null;
   }
 
   /** 获取父节点（用于"在树中定位"功能） */

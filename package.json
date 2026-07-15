@@ -114,7 +114,7 @@
         {
           "command": "backtrace.deleteNode",
           "when": "view == backtraceTree",
-          "group": "navigation"
+          "group": "inline"
         }
       ]
     }
