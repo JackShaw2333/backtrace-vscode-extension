@@ -18,7 +18,7 @@
 
 import * as vscode from 'vscode';
 import { NavTree } from '../nav-tree';
-import { navigateToNode } from './go-back';
+import { navigateToNode } from './navigate';
 import { readConfig } from '../config';
 
 /** 注册前进命令 */

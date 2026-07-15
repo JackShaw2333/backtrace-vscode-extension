@@ -22,7 +22,7 @@ import * as vscode from 'vscode';
 import { NavTree } from '../nav-tree';
 import { NavNode } from '../nav-node';
 import { FILE_COLORS } from '../constants';
-import { navigateToNode } from '../commands/go-back';
+import { navigateToNode } from '../commands/navigate';
 
 export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
   /**
