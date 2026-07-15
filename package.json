@@ -102,22 +102,7 @@
         "when": "backtrace.isEmpty",
         "contents": "No navigation history yet.\nNavigate with F12/Ctrl+Click to start tracking."
       }
-    ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "backtrace.deleteNode",
-          "when": "false"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "backtrace.deleteNode",
-          "when": "view == backtraceTree",
-          "group": "inline"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
