@@ -3,7 +3,6 @@
 
 import * as assert from 'assert';
 import { NavTree } from '../nav-tree';
-import { readConfig } from '../config';
 
 suite('NavTree', () => {
   test('addJump creates a child under root on first call', () => {

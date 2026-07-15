@@ -3,7 +3,7 @@
 
 import * as assert from 'assert';
 import { NavTree } from '../nav-tree';
-import { readConfig, BacktraceConfig } from '../config';
+import { BacktraceConfig } from '../config';
 
 suite('Backtrace Extension', () => {
   test('NavTree handles empty tree gracefully', () => {
