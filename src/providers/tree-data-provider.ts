@@ -1,8 +1,18 @@
 /**
  * 侧边栏树视图（Explorer 中的 "Backtrace Tree"）。
  *
- * 在左侧文件浏览区下方显示导航树的完整结构。
- * 用户可以点击任意节点跳转到对应位置。
+ * 显示位置：左侧 Activity Bar → Explorer（资源管理器）→ 最下方 "Backtrace Tree" 区域
+ *
+ *   VSCode 布局参考：
+ *     ┌─────────────┬────────────────────────┐
+ *     │  ① Activity │  ② Side Bar           │
+ *     │    Bar      │  ├─ Explorer           │
+ *     │  (左侧图标  │  │  ├─ 文件列表        │
+ *     │   栏)       │  │  └─ Backtrace Tree  ← 这里是本视图
+ *     │    ·        │  ├─ Search             │
+ *     │    ·        │  └─ ...               │
+ *     └─────────────┴────────────────────────┘
+ *       ③ Panel（底部面板）
  *
  * TreeDataProvider 是 VSCode 的标准接口，有点像"翻译器"：
  *   把数据（NavNode）翻译成 VSCode 能显示的样子（TreeItem）。
@@ -62,10 +72,18 @@ export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
     // description：标题右边的灰色文字，显示文件名:行号
     item.description = `${this.shortFileName(element.uri)}:${element.line}`;
 
-    // color：标题的颜色。这个属性在 @types/vscode 中没有声明，
-    // 但 VSCode 运行时支持 TreeItem.color。
-    // 用 eslint-disable-next-line 绕过 no-explicit-any 检查，
-    // 比 (item as any) 更安全——只禁用这一行，不会影响其他代码。
+    // color：标题的颜色。'as any' 是 TypeScript 的类型断言（type assertion）：
+    //   (item as any) 告诉 TypeScript "把 item 当作 any 类型处理"，
+    //   这样就能访问任何属性（包括 .color），且不会报类型错误。
+    //
+    // 为什么需要 (item as any)？
+    //   @types/vscode 的 TreeItem 类型没有声明 .color 属性，
+    //   但 VSCode 运行时确实支持它。类型断言是"绕过类型检查"的方式。
+    //
+    // 为什么 ESLint 报错 "Unexpected any"？
+    //   @typescript-eslint/no-explicit-any 规则禁止使用 any，
+    //   因为 any 会完全关闭类型检查——本应编译报错的代码也不会报错了。
+    //   这里用 eslint-disable-next-line 禁用了这行检查，是故意为之。
     const colorIndex = this.getFileColorIndex(element.uri);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
@@ -97,7 +115,24 @@ export class BacktraceTreeProvider implements vscode.TreeDataProvider<NavNode> {
     return element.parent;
   }
 
-  /** 从 URI 中提取简短的文件名 */
+  /**
+   * 从 URI 中提取简短的文件名。
+   *
+   * .pop() 是 JavaScript 的数组方法：**删除数组最后一个元素，并返回它**。
+   *   例：['file:', '', 'c:', 'app.ts'].pop() → 'app.ts'
+   *   原数组变为 ['file:', '', 'c:']
+   *
+   * 步骤拆解：
+   *   uri.split('/')          → 按 / 分割字符串为数组
+   *                             "file:///c:/a.ts" → ["file:", "", "", "c:", "a.ts"]
+   *   .pop()                  → 取数组的最后一个元素 → "a.ts"
+   *   || uri.split('\\').pop()→ 如果是 Windows 路径，用 \ 分割再取最后一段
+   *   || uri                  → 上面两步都失败时，用原字符串兜底
+   *
+   * 为什么用 ||（逻辑或）连接？
+   *   || 返回第一个"真值"（truthy）。空字符串是"假值"（falsy），
+   *   所以 .pop() 拿到空字符串时会自动试下一个。
+   */
   private shortFileName(uri: string): string {
     return uri.split('/').pop() || uri.split('\\').pop() || uri;
   }
