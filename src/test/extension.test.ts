@@ -1,3 +1,5 @@
+/// <reference types="mocha" />
+
 import * as assert from 'assert';
 import { NavTree } from '../nav-tree';
 import { readConfig, BacktraceConfig } from '../config';
