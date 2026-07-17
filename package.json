@@ -81,8 +81,7 @@
       "backtrace": [
         {
           "id": "backtraceStack",
-          "name": "Backtrace Stack",
-          "type": "webview",
+          "name": "Backtrace Tree",
           "icon": "$(list-tree)"
         }
       ]
@@ -102,7 +101,16 @@
         "when": "backtrace.isEmpty",
         "contents": "No navigation history yet.\nNavigate with F12/Ctrl+Click to start tracking."
       }
-    ]
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "backtrace.deleteNode",
+          "when": "view == backtraceStack && viewItem != 'root'",
+          "group": "inline"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

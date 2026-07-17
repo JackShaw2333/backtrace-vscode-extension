@@ -71,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
     // 时刻可能还没赋值（它们在后面几行才被赋值），
     // 但被调用时一定已经赋值了。?. 防止万一。
     pathProvider?.refresh();
-    treeProvider?.update();
+    treeProvider?.refresh();
 
     // 更新"空树"上下文变量，控制 viewsWelcome 帮助文字的显示/隐藏。
     // setContext 只在 activate() 时执行一次，后续树变化时需要同步更新。
@@ -103,8 +103,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceTree', pathProvider));
 
   // 7. 注册底部树视图面板
-  treeProvider = new BacktraceTreePanelProvider(tree, context.extensionUri);
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider(BacktraceTreePanelProvider.viewType, treeProvider));
+  treeProvider = new BacktraceTreePanelProvider(tree);
+  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceStack', treeProvider));
 
   // 8. 启动命令监听器
   commandWatcher = new CommandWatcher(tree);
