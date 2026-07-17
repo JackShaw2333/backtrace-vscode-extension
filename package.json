@@ -106,7 +106,7 @@
       "view/item/context": [
         {
           "command": "backtrace.deleteNode",
-          "when": "view == backtraceStack && viewItem != 'root'",
+          "when": "view == backtraceStack",
           "group": "inline"
         }
       ]
