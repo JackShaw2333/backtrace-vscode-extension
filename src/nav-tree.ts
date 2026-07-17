@@ -56,12 +56,14 @@ export class NavTree {
     }
 
     this.pruneIfExceeded();
+    this.dump('addJump');
     return node;
   }
 
   goBack(): NavNode | null {
     if (!this.currentNode?.parent) return null;
     this.currentNode = this.currentNode.parent;
+    this.dump('goBack');
     return this.currentNode;
   }
 
@@ -74,6 +76,7 @@ export class NavTree {
     const children = this.getForwardOptions();
     if (index < 0 || index >= children.length) return null;
     this.currentNode = children[index];
+    this.dump('goForward');
     return this.currentNode;
   }
 
@@ -108,6 +111,7 @@ export class NavTree {
       }
       node = node.parent;
     }
+    this.dump('removeNode');
   }
 
   private calcDepth(node: NavNode): number {
@@ -125,6 +129,31 @@ export class NavTree {
       for (const child of node.children) {
         this.collectLeaves(child, leaves);
       }
+    }
+  }
+
+  /**
+   * 输出整棵树的当前形态到日志，便于调试。
+   * operation 参数标识触发本次输出的操作。
+   */
+  dump(operation: string): void {
+    console.log(`[Backtrace] ═══ TREE after ${operation} ═══`);
+    console.log(`[Backtrace]   currentNode: ${this.currentNode?.symbolName || '(null)'}`);
+    if (!this.root) {
+      console.log('[Backtrace]   (empty)');
+      return;
+    }
+    this._dumpNode(this.root, '  ');
+    console.log('[Backtrace] ════════════════');
+  }
+
+  private _dumpNode(node: NavNode, indent: string): void {
+    const fileName = (node.uri || '').split('/').pop() || (node.uri || '').split('\\').pop() || '';
+    const label = node.contextName || node.symbolName || '(root)';
+    const marker = node === this.currentNode ? ' <─ current' : '';
+    console.log(`[Backtrace] ${indent}├─ ${label} @ ${fileName}:${node.line} (${node.children.length} children)${marker}`);
+    for (const child of node.children) {
+      this._dumpNode(child, indent + '  ');
     }
   }
 

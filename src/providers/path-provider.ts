@@ -94,6 +94,15 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
 
     // contextValue：用于上下文菜单和 when 表达式
     item.contextValue = isCurrent ? 'currentNode' : 'node';
+
+    // collapsibleState：告诉 VSCode 哪些节点可以展开。
+    // 没有设置时默认是 None → VSCode 不调用 getChildren → 子节点不可见。
+    // 侧边栏路径上，中间节点始终展开（让用户看到完整路径），
+    // 当前节点（路径终点）没有子节点需要展示。
+    item.collapsibleState = element.children.length > 0
+      ? vscode.TreeItemCollapsibleState.Expanded
+      : vscode.TreeItemCollapsibleState.None;
+
     return item;
   }
 

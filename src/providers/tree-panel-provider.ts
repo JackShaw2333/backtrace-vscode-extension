@@ -20,6 +20,7 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
   constructor(private tree: NavTree) {}
 
   refresh(): void {
+    console.log('[Backtrace] TreeView refresh fired');
     this._onDidChangeTreeData.fire(undefined);
   }
 
@@ -57,14 +58,27 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
     // contextValue：用于右键菜单的 when 条件
     item.contextValue = element === this.tree.currentNode ? 'currentNode' : 'node';
     if (element === this.tree.root) item.contextValue = 'root';
+
+    // collapsibleState：告诉 VSCode 哪些节点可展开。
+    // 没有设置这个属性的节点不会显示展开箭头，
+    // VSCode 也不会为它们调用 getChildren → 子节点不可见。
+    // Expanded：默认展开（底部面板目标：一眼看到完整树）
+    item.collapsibleState = element.children.length > 0
+      ? vscode.TreeItemCollapsibleState.Expanded
+      : vscode.TreeItemCollapsibleState.None;
+
     return item;
   }
 
   /** 获取子节点。底部面板展示全部子节点（完整树） */
   getChildren(element?: NavNode): NavNode[] {
     if (!this.tree.root) return [];
-    if (!element) return [this.tree.root]; // 第一层：根节点
-    return element.children; // 返回所有子节点（完整树）
+    if (!element) {
+      console.log('[Backtrace] TreeView getChildren() → root');
+      return [this.tree.root];
+    }
+    console.log(`[Backtrace] TreeView getChildren(${element.symbolName || 'root'}) → ${element.children.length} children`);
+    return element.children;
   }
 
   /** 获取父节点 */
