@@ -108,6 +108,11 @@
           "command": "backtrace.deleteNode",
           "when": "view == backtraceStack",
           "group": "inline"
+        },
+        {
+          "command": "backtrace.deleteNode",
+          "when": "view == backtraceTree",
+          "group": "inline"
         }
       ]
     }
