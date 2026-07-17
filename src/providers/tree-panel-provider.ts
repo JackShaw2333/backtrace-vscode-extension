@@ -29,23 +29,27 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
     const display = element.contextName || element.symbolName || '(root)';
     const fileName = this.shortFileName(element.uri);
 
-    // 使用 format 显示 "fileName:line   symbolName"
+    // label: 当前节点加 ● 前缀（高亮方案①）
+    // description: 当前节点加 ← current 后缀（高亮方案②）
+    const label = isCurrent ? `● ${display}` : display;
+
     const item = new vscode.TreeItem({
-      label: display,
+      label,
       highlights: undefined,
     });
 
-    // description 显示文件名:行号（灰色次要文字）
-    item.description = `${fileName}:${element.line}`;
+    item.description = isCurrent
+      ? `${fileName}:${element.line}  ← current`
+      : `${fileName}:${element.line}`;
 
     // 文件颜色
     const colorIndex = this.getFileColorIndex(element.uri);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
 
-    // 图标：当前节点用箭头，其他用函数图标
+    // 图标：当前节点用实心圆（高亮方案③），其他用函数图标
     item.iconPath = isCurrent
-      ? new vscode.ThemeIcon('arrow-right')
+      ? new vscode.ThemeIcon('circle-filled')
       : new vscode.ThemeIcon('symbol-method');
 
     // 点击跳转
