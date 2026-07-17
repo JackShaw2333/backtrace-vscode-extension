@@ -237,11 +237,14 @@ export class BacktraceTreePanelProvider implements vscode.WebviewViewProvider {
     const indent = depth * 20;  // 每层缩进 20 像素
     const idxAttr = JSON.stringify(indices);  // 转成 JSON 字符串存入 HTML
 
-    // 模板字符串：用反引号 ` 包裹，${} 插入变量
-    // 每行是一个 <div>，包含：删除按钮、颜色圆点、文件名:行号、函数名、←标记
+    // 模板字符串：每行是一个 flex 容器，包含：
+    //   最左侧 → × 删除按钮（不缩进）
+    //   其后 → 缩进占位（按 depth 层级）
+    //   其后 → 颜色圆点 + 文件名:行号 + 函数名
     let html = `
-      <div class="stack-row ${isCurrent ? 'current' : ''}" style="padding-left:${indent + 8}px" data-idx='${idxAttr}'>
+      <div class="stack-row ${isCurrent ? 'current' : ''}" data-idx='${idxAttr}'>
         <span class="delete-btn" data-action="delete">&times;</span>
+        <span class="indent" style="width:${indent}px"></span>
         <span class="file-color" style="background:${color}"></span>
         <span class="file-loc">${this.escapeHtml(fileName)}:${node.line}</span>
         <span class="func-path">${this.escapeHtml(display)}</span>
@@ -289,7 +292,7 @@ body {
   display: flex;         /* 弹性布局：子元素横向排列 */
   align-items: center;   /* 垂直居中 */
   gap: 5px;              /* 子元素间距 */
-  padding: 3px 8px;      /* 内边距 */
+  padding: 3px 0;        /* 上下 3px，左右 0（× 按钮紧贴左侧） */
   cursor: pointer;       /* 鼠标变为手型，提示可点击 */
   border-radius: 2px;
 }
@@ -338,12 +341,20 @@ body {
   cursor: pointer;
   font-size: 12px;
   opacity: 0.6;
+  flex-shrink: 0;  /* 不被压缩 */
+  min-width: 14px; /* 保证可点击区域 */
+  text-align: center;
 }
 .delete-btn:hover {
   opacity: 1;
 }
 .stack-row:hover .delete-btn {
   visibility: visible;
+}
+
+/* 缩进占位：根据 depth 层级产生树状缩进效果 */
+.indent {
+  flex-shrink: 0;
 }
 
 /* 空树提示 */
