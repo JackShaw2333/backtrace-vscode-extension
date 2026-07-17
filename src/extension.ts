@@ -9,7 +9,7 @@
  *   1. 创建 NavTree（核心数据结构）
  *   2. 从持久化存储恢复导航树
  *   3. 注册所有命令（goBack、goForward、内部命令）
- *   4. 注册 UI 视图（侧边栏树、底部面板）
+ *   4. 注册 UI 视图（侧边栏堆栈、底部树面板）
  *   5. 启动命令监听器
  *   6. 监听配置变化
  */
@@ -97,14 +97,14 @@ export function activate(context: vscode.ExtensionContext) {
   registerDeleteNode(context, tree);
   registerJumpCommand(context, tree);
 
-  // 6. 注册侧边栏路径视图
-  //    'backtraceTree' 必须是 package.json 中注册的视图 ID
+  // 6. 注册侧边栏堆栈视图
+  //    'backtraceStack' 必须是 package.json 中注册的视图 ID
   pathProvider = new BacktracePathProvider(tree);
-  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceTree', pathProvider));
+  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceStack', pathProvider));
 
   // 7. 注册底部树视图面板
   treeProvider = new BacktraceTreePanelProvider(tree);
-  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceStack', treeProvider));
+  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceTree', treeProvider));
 
   // 8. 启动命令监听器
   commandWatcher = new CommandWatcher(tree);

@@ -31,32 +31,36 @@ VSCode 扩展：用**树形导航**替代 VSCode 原生线性堆栈导航历史�
 
 ---
 
-## 架构（设计方案）
+## 架构
 
 ```
 src/
 ├── extension.ts              # activate / deactivate
-├── NavTree.ts                # 树数据结构 + 持久化
-├── CommandWatcher.ts         # 命令拦截与位置捕获
+├── nav-tree.ts               # 树数据结构 + 持久化 + dump 日志
+├── nav-node.ts               # NavNode 接口与序列化类型
+├── command-watcher.ts        # 导航拦截与位置捕获（onDidChangeTextEditorSelection）
+├── symbol-utils.ts           # 从文件位置提取函数/类上下文
 ├── config.ts                 # 设置读取
-├── constants.ts              # 预置命令白名单
+├── constants.ts              # 常量（颜色、防抖时间、持久化 key）
 ├── providers/
-│   ├── TreeDataProvider.ts   # 侧边栏树视图
-│   └── StackPanelProvider.ts # 底部堆栈 Webview
+│   ├── path-provider.ts      # 侧边栏堆栈视图（扁平列表：root→currentNode）
+│   └── tree-panel-provider.ts # 底部面板树视图（完整展开树）
 └── commands/
-    ├── goBack.ts             # 后退命令
-    └── goForward.ts          # 前进命令
+    ├── go-back.ts            # 后退命令
+    ├── go-forward.ts         # 前进命令（多分支：notification / quickpick）
+    ├── delete-node.ts        # 删除节点命令
+    └── navigate.ts           # 跳转到节点位置（isInternalNav 标志）
 ```
 
 ### 关键模块
 
 | 模块 | 职责 |
 |------|------|
-| `NavTree` | 树形数据结构（NavNode），含 parent/children 链接、persist/restore 到 `context.globalState` |
-| `CommandWatcher` | 用 `vscode.commands.onDidExecuteCommand` 监听白名单命令，捕获跳转前位置，等待光标稳定后创建新节点 |
+| `NavTree` | 树形数据结构（NavNode），含 parent/children 链接、addJump/goBack/goForward/removeNode、serialize/deserialize、dump 日志 |
+| `CommandWatcher` | 用 `onDidChangeTextEditorSelection`（event.kind === Command）拦截 F12/Ctrl+Click 跳转，120ms 防抖后确认并记录 |
 | `config` | 从 `vscode.workspace.getConfiguration('backtrace')` 读取设置 |
-| `TreeDataProvider` | 实现 `TreeDataProvider`，在 Explorer 侧边栏展示完整导航树 |
-| `StackPanelProvider` | WebviewView，显示当前分支路径（root→currentNode） |
+| `BacktracePathProvider` | TreeDataProvider，侧边栏（id: `backtraceStack`）— 扁平列表显示 root→currentNode 线性路径 |
+| `BacktraceTreePanelProvider` | TreeDataProvider，底部面板（id: `backtraceTree`）— 完整展开树，右键 × 删除节点 |
 | `goBack/goForward` | 注册 `backtrace.goBack` / `backtrace.goForward` 命令 |
 
 ### 数据结构

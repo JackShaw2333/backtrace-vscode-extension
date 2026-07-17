@@ -66,12 +66,12 @@ export function registerGoForward(context: vscode.ExtensionContext, tree: NavTre
     switch (config.forwardBehavior) {
       case 'notification': {
         // notification 模式（默认）：状态栏提示 + 引导用户使用 UI
-        // 用户可以通过侧边栏 Backtrace Tree 或底部 Stack 面板选择目标分支
+        // 用户可以通过侧边栏 Backtrace Stack 或底部 Backtrace Tree 面板选择目标分支
         // 提示中同时告知用户可在设置中修改行为
         vscode.window.setStatusBarMessage(
           '$(arrow-right) Backtrace: ' +
             options.length +
-            ' forward locations available — use Backtrace Tree sidebar. ' +
+            ' forward locations available — use Backtrace Stack sidebar. ' +
             '(Change via backtrace.forwardBehavior in settings)',
           5000,
         );

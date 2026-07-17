@@ -63,7 +63,7 @@
             "quickpick"
           ],
           "enumDescriptions": [
-            "Show a status bar message when multiple forward options are available — use the Tree sidebar to navigate",
+            "Show a status bar message when multiple forward options are available — use the Backtrace Stack sidebar to navigate",
             "Show a QuickPick list to choose from multiple forward options immediately"
           ],
           "description": "How to handle multiple forward navigation targets"
@@ -73,14 +73,14 @@
     "views": {
       "explorer": [
         {
-          "id": "backtraceTree",
+          "id": "backtraceStack",
           "name": "Backtrace Stack",
           "icon": "$(list-tree)"
         }
       ],
       "backtrace": [
         {
-          "id": "backtraceStack",
+          "id": "backtraceTree",
           "name": "Backtrace Tree",
           "icon": "$(list-tree)"
         }
@@ -97,7 +97,7 @@
     },
     "viewsWelcome": [
       {
-        "view": "backtraceTree",
+        "view": "backtraceStack",
         "when": "backtrace.isEmpty",
         "contents": "No navigation history yet.\nNavigate with F12/Ctrl+Click to start tracking."
       }
@@ -106,12 +106,12 @@
       "view/item/context": [
         {
           "command": "backtrace.deleteNode",
-          "when": "view == backtraceStack",
+          "when": "view == backtraceTree",
           "group": "inline"
         },
         {
           "command": "backtrace.deleteNode",
-          "when": "view == backtraceTree",
+          "when": "view == backtraceStack",
           "group": "inline"
         }
       ]
