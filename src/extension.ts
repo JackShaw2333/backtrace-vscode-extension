@@ -16,6 +16,7 @@
 
 import * as vscode from 'vscode';
 import { NavTree } from './nav-tree';
+import { NavNode } from './nav-node';
 import { CommandWatcher } from './command-watcher';
 import { readConfig } from './config';
 import { PERSISTENCE_KEY } from './constants';
@@ -32,6 +33,10 @@ import { BacktraceTreePanelProvider } from './providers/tree-panel-provider';
 let commandWatcher: CommandWatcher;
 let pathProvider: BacktracePathProvider;
 let treeProvider: BacktraceTreePanelProvider;
+// TreeView 引用：用于 reveal() 展开节点。
+// registerTreeDataProvider 不返回引用，所以改用 createTreeView。
+let pathView: vscode.TreeView<NavNode>;
+let treeView: vscode.TreeView<NavNode>;
 
 /**
  * VSCode 扩展激活入口。
@@ -73,6 +78,17 @@ export function activate(context: vscode.ExtensionContext) {
     pathProvider?.refresh();
     treeProvider?.refresh();
 
+    // reveal currentNode 确保新子节点可见。
+    // TreeView 需要一小段时间处理 refresh，所以用 nextTick。
+    // reveal({ expand: true }) 会展开父节点路径，让新子节点可见。
+    if (tree.currentNode) {
+      const cn = tree.currentNode;
+      setTimeout(() => {
+        pathView?.reveal(cn, { expand: true });
+        treeView?.reveal(cn, { expand: 1 });
+      }, 50);
+    }
+
     // 更新"空树"上下文变量，控制 viewsWelcome 帮助文字的显示/隐藏。
     // setContext 只在 activate() 时执行一次，后续树变化时需要同步更新。
     vscode.commands.executeCommand('setContext', 'backtrace.isEmpty', !tree.root);
@@ -99,12 +115,16 @@ export function activate(context: vscode.ExtensionContext) {
 
   // 6. 注册侧边栏堆栈视图
   //    'backtraceStack' 必须是 package.json 中注册的视图 ID
+  //    用 createTreeView 代替 registerTreeDataProvider，
+  //    因为 createTreeView 返回 TreeView 引用，支持 reveal() 展开节点。
   pathProvider = new BacktracePathProvider(tree);
-  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceStack', pathProvider));
+  pathView = vscode.window.createTreeView('backtraceStack', { treeDataProvider: pathProvider });
+  context.subscriptions.push(pathView);
 
   // 7. 注册底部树视图面板
   treeProvider = new BacktraceTreePanelProvider(tree);
-  context.subscriptions.push(vscode.window.registerTreeDataProvider('backtraceTree', treeProvider));
+  treeView = vscode.window.createTreeView('backtraceTree', { treeDataProvider: treeProvider });
+  context.subscriptions.push(treeView);
 
   // 8. 启动命令监听器
   commandWatcher = new CommandWatcher(tree);
