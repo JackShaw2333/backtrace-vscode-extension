@@ -1,13 +1,12 @@
 /**
- * 侧边栏路径视图（Explorer 中的 "Backtrace Stack"）。
+ * 侧边栏堆栈视图（Explorer 中的 "Backtrace Stack"）。
  *
- * 显示从根节点到当前节点的线性路径（类似堆栈回溯），
- * 每层只展示一个子节点——朝向 currentNode 的那一个。
+ * 以扁平列表显示从根节点到当前节点的线性路径。
+ * 每层一个节点，无嵌套层级——类似函数调用栈的回溯列表。
  *
  * 显示位置：左侧 Activity Bar → Explorer → "Backtrace Stack" 区域
  *
- * TreeDataProvider 是 VSCode 的标准接口，有点像"翻译器"：
- *   把数据（NavNode）翻译成 VSCode 能显示的样子（TreeItem）。
+ * TreeDataProvider 是 VSCode 的标准接口：把数据（NavNode）翻译成 VSCode 能显示的 TreeItem。
  */
 
 import * as vscode from 'vscode';
@@ -94,44 +93,32 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
 
     // contextValue：用于上下文菜单和 when 表达式
     item.contextValue = isCurrent ? 'currentNode' : 'node';
-
-    // collapsibleState：告诉 VSCode 哪些节点可以展开。
-    // 没有设置时默认是 None → VSCode 不调用 getChildren → 子节点不可见。
-    // 侧边栏路径上，中间节点始终展开（让用户看到完整路径），
-    // 当前节点（路径终点）没有子节点需要展示。
-    item.collapsibleState = element.children.length > 0
-      ? vscode.TreeItemCollapsibleState.Expanded
-      : vscode.TreeItemCollapsibleState.None;
-
     return item;
   }
 
-  /** 获取子节点。侧边栏只显示从根到当前的线性路径 */
+  /** 获取子节点。返回从根到当前的完整线性路径作为扁平列表（无嵌套） */
   getChildren(element?: NavNode): NavNode[] {
     if (!this.tree.root) return [];
-    if (!element) return [this.tree.root];  // 第一层：根节点
-    // 后续层：返回朝向 currentNode 方向的子节点（最多一个）
-    const next = this.childTowardCurrent(element);
-    return next ? [next] : [];
+    // 只在顶层返回完整路径，子层级永远返回空（保证扁平列表效果）
+    if (element) return [];
+    return this.pathToCurrent();
   }
 
-  /**
-   * 在 element 的子节点中，找到"朝向 currentNode 方向"的那一个。
-   * 算法：从 currentNode 沿 parent 链上溯到 element 的层级，
-   * 返回那个子节点。
-   */
-  private childTowardCurrent(node: NavNode): NavNode | null {
-    let cur = this.tree.currentNode;
-    while (cur && cur.parent) {
-      if (cur.parent === node) return cur;
+  /** 收集从根到当前节点的线性路径 */
+  private pathToCurrent(): NavNode[] {
+    const path: NavNode[] = [];
+    // 从 currentNode 向上回溯到根，再反转顺序
+    let cur: NavNode | null = this.tree.currentNode;
+    while (cur) {
+      path.push(cur);
       cur = cur.parent;
     }
-    return null;
+    return path.reverse();
   }
 
-  /** 获取父节点（用于"在树中定位"功能） */
-  getParent(element: NavNode): NavNode | null {
-    return element.parent;
+  /** 获取父节点（扁平列表下始终返回 null，无层级关系） */
+  getParent(_element: NavNode): NavNode | null {
+    return null;
   }
 
   /**

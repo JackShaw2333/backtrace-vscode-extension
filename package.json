@@ -74,7 +74,7 @@
       "explorer": [
         {
           "id": "backtraceTree",
-          "name": "Backtrace Tree",
+          "name": "Backtrace Stack",
           "icon": "$(list-tree)"
         }
       ],
