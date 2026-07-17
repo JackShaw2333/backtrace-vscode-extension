@@ -15,6 +15,8 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { NavTree } from '../nav-tree';
 import { NavNode } from '../nav-node';
 import { FILE_COLORS } from '../constants';
@@ -22,24 +24,21 @@ import { FILE_COLORS } from '../constants';
 export class BacktraceTreePanelProvider implements vscode.WebviewViewProvider {
   // viewType：在 package.json 中声明的视图 ID，必须一致。
   // static 表示不创建实例也能访问：BacktraceTreePanelProvider.viewType
-  // readonly 表示初始化后不能修改。
   public static readonly viewType = 'backtraceStack';
 
   // _view：保存 WebviewView 实例，用于后续更新内容。
-  // ? 表示可能为 undefined（面板还没创建时）。
-  // 为什么用 private 加下划线 _ 前缀？
-  //   这是 TypeScript 约定：_ 开头表示"内部使用，外部不该访问"。
   private _view?: vscode.WebviewView;
 
-  /**
-   * constructor 的参数属性快捷写法：
-   *   private tree: NavTree
-   *   自动创建 this.tree，等价于：
-   *     private tree: NavTree;
-   *     constructor(tree: NavTree) { this.tree = tree; }
-   * 为什么存 tree？因为需要遍历 tree.root 来显示所有节点。
-   */
-  constructor(private tree: NavTree) {}
+  // htmlTemplateCache：HTML 模板的缓存，只在第一次读取时读磁盘。
+  // static：所有实例共享同一份缓存。null = 还没读取过。
+  private static htmlTemplateCache: string | null = null;
+
+  private readonly extensionUri: vscode.Uri;
+
+  constructor(private tree: NavTree, extensionUri: vscode.Uri) {
+    // 存 extensionUri 用于定位 media/stack-panel.html
+    this.extensionUri = extensionUri;
+  }
 
   /**
    * resolveWebviewView：WebviewViewProvider 的核心方法。
@@ -269,147 +268,25 @@ export class BacktraceTreePanelProvider implements vscode.WebviewViewProvider {
    * 每次 update() 都会重新生成全部 HTML，替换整个 webview 内容。
    */
   private buildHtml(): string {
-    // 如果树为空，显示"暂无记录"；否则递归渲染所有节点
+    // 渲染所有节点
     const treeHtml = this.tree.root ? this.renderNode(this.tree.root, 0, []) : '';
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<style>
-/* VSCode 自定义 CSS 属性（var(--vscode-...)）：
-   这些变量由 VSCode 动态注入到 webview 中，值随当前主题变化。
-   使用这些变量可以保证我们的 webview 颜色和 VSCode 主题一致。 */
+    // 处理空树情况：树为空时显示提示文字
+    const bodyContent = treeHtml || '<div class="empty">No navigation history</div>';
 
-body {
-  font-family: var(--vscode-font-family);
-  font-size: 13px;
-  padding: 4px 0;
-  margin: 0;
-}
-
-/* 每条导航记录的行 */
-.stack-row {
-  display: flex;         /* 弹性布局：子元素横向排列 */
-  align-items: center;   /* 垂直居中 */
-  gap: 5px;              /* 子元素间距 */
-  padding: 3px 0;        /* 上下 3px，左右 0（× 按钮紧贴左侧） */
-  cursor: pointer;       /* 鼠标变为手型，提示可点击 */
-  border-radius: 2px;
-}
-
-.stack-row:hover {
-  background: var(--vscode-list-hoverBackground); /* 悬停高亮 */
-}
-
-.stack-row.current {
-  background: var(--vscode-list-activeSelectionBackground);
-  color: var(--vscode-list-activeSelectionForeground);
-}
-
-/* 文件颜色小圆点 */
-.file-color {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;  /* 圆形 */
-  flex-shrink: 0;      /* 不被压缩 */
-}
-
-/* 文件名:行号（配色方案颜色） */
-.file-loc {
-  color: var(--vscode-textPreformat-foreground);
-  white-space: nowrap;  /* 不换行 */
-}
-
-/* 函数路径 */
-.func-path {
-  font-weight: 500;      /* 中等粗细 */
-  white-space: nowrap;
-}
-
-.spacer {
-  flex: 1; /* 占据所有剩余空间，把 ← 推到右边 */
-}
-
-.badge {
-  font-weight: bold;
-  font-size: 12px;
-}
-
-/* × 删除按钮：默认隐藏，hover 时显示 */
-.delete-btn {
-  visibility: hidden;
-  cursor: pointer;
-  font-size: 12px;
-  opacity: 0.6;
-  flex-shrink: 0;  /* 不被压缩 */
-  min-width: 14px; /* 保证可点击区域 */
-  text-align: center;
-}
-.delete-btn:hover {
-  opacity: 1;
-}
-.stack-row:hover .delete-btn {
-  visibility: visible;
-}
-
-/* 缩进占位：根据 depth 层级产生树状缩进效果 */
-.indent {
-  flex-shrink: 0;
-}
-
-/* 空树提示 */
-.empty {
-  color: var(--vscode-disabledForeground);
-  padding: 16px;
-  text-align: center;
-}
-</style>
-</head>
-<body>
-${treeHtml || '<div class="empty">No navigation history</div>'}
-
-<script>
-// ── Webview JavaScript — 在"隔离浏览器"中运行 ──
-// 这个脚本在 VSCode 的 webview 沙箱中执行。
-// 它不能访问 Node.js API，也不在真实浏览器中。
-// 通过 acquireVsCodeApi() 获得有限的通信能力。
-
-(function() {
-  "use strict";  // 严格模式
-
-  // acquireVsCodeApi()：获取 VSCode 提供的 API 对象。
-  // 这个函数由 VSCode 注入到 webview 的全局作用域中。
-  // API 对象只有一个方法：postMessage()。
-  const vscode = acquireVsCodeApi();
-
-  // 遍历所有 .stack-row 元素
-  document.querySelectorAll('.stack-row').forEach(row => {
-    // dataset.idx：读取 HTML 的 data-idx 属性。
-    // HTML：data-idx='[0,1]'
-    // JS：row.dataset.idx → "[0,1]"
-    // JSON.parse → [0, 1]
-    const idx = JSON.parse(row.dataset.idx);
-
-    // 点击整行 → 跳转（除非点的是 × 按钮）
-    row.addEventListener('click', (e) => {
-      // classList.contains：判断点击目标是否包含某个 CSS 类名
-      if (e.target.classList.contains('delete-btn')) return;  // × 按钮不触发跳转
-      // postMessage：发送消息给扩展（TypeScript 端）
-      vscode.postMessage({ command: 'jumpTo', indices: idx });
-    });
-
-    // × 删除按钮的独立点击事件
-    const delBtn = row.querySelector('.delete-btn');
-    if (delBtn) {
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();  // 阻止事件冒泡：避免触发上层的 row.click
-        vscode.postMessage({ command: 'deleteNode', indices: idx });
-      });
+    // 从缓存读取 HTML 模板（首次运行从磁盘加载）
+    if (!BacktraceTreePanelProvider.htmlTemplateCache) {
+      const htmlPath = path.join(this.extensionUri.fsPath, 'media', 'stack-panel.html');
+      BacktraceTreePanelProvider.htmlTemplateCache = fs.readFileSync(htmlPath, 'utf-8');
     }
-  });
-})();
-</script>
-</body>
-</html>`;
+
+    // 替换占位符 ${treeHtml} 为实际内容
+    // replace(/\$\{treeHtml\}/g, ...)：
+    //   \$ 转义 $，\$\{ = ${，\}
+    //   g 修饰符 = 全局替换（所有匹配项）
+    return BacktraceTreePanelProvider.htmlTemplateCache.replace(
+      /\$\{treeHtml\}/g,
+      bodyContent,
+    );
   }
 }
