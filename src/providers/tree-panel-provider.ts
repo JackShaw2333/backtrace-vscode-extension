@@ -47,9 +47,9 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
 
-    // 图标：当前节点用实心圆（高亮方案③），其他用函数图标
+    // 图标：当前节点用箭头，其他用函数图标
     item.iconPath = isCurrent
-      ? new vscode.ThemeIcon('circle-filled')
+      ? new vscode.ThemeIcon('arrow-right')
       : new vscode.ThemeIcon('symbol-method');
 
     // 点击跳转
