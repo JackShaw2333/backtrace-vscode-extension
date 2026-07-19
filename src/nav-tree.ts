@@ -15,6 +15,17 @@
 import { NavNode, SerializedNavNode, SerializedTree } from './nav-node';
 
 /**
+ * 调用者位置（从父节点的哪里跳转过来）。
+ * 用于"跳转到调用位置"按钮精确回到触发 F12 的那一行，
+ * 而不是父节点函数的初始位置。
+ */
+export interface CallerPosition {
+  uri: string;
+  line: number;
+  column: number;
+}
+
+/**
  * NavTree 类 = 整棵导航树。
  */
 export class NavTree {
@@ -28,8 +39,19 @@ export class NavTree {
 
   /**
    * 记录一次跳转。
+   *
+   * @param callerPosition 跳转前光标所在位置（即父节点的调用点）。
+   *   根节点没有调用者，应传 null。旧调用方不传该参数时默认为 null，
+   *   保持向后兼容。
    */
-  addJump(uri: string, line: number, column: number, symbolName: string, contextName: string = ''): NavNode {
+  addJump(
+    uri: string,
+    line: number,
+    column: number,
+    symbolName: string,
+    contextName: string = '',
+    callerPosition: CallerPosition | null = null,
+  ): NavNode {
     console.log(`[Backtrace]   └ addJump → ${contextName || symbolName}`);
     const node: NavNode = {
       uri,
@@ -40,6 +62,9 @@ export class NavTree {
       children: [],
       parent: null,
       timestamp: Date.now(),
+      callerUri: callerPosition?.uri ?? null,
+      callerLine: callerPosition?.line ?? null,
+      callerColumn: callerPosition?.column ?? null,
     };
 
     if (!this.root) {
@@ -177,6 +202,9 @@ export class NavTree {
       timestamp: node.timestamp,
       parentIndex: node.parent ? (indexMap.get(node.parent) ?? null) : null,
       childrenIndices: node.children.map((c) => indexMap.get(c)).filter((i): i is number => i !== undefined),
+      callerUri: node.callerUri ?? null,
+      callerLine: node.callerLine ?? null,
+      callerColumn: node.callerColumn ?? null,
     }));
     return {
       nodes: serializedNodes,
@@ -196,6 +224,10 @@ export class NavTree {
       timestamp: sn.timestamp,
       children: [],
       parent: null,
+      // 旧持久化数据没有 caller* 字段 → ?? null 兜底，UI 不显示调用行
+      callerUri: sn.callerUri ?? null,
+      callerLine: sn.callerLine ?? null,
+      callerColumn: sn.callerColumn ?? null,
     }));
     for (let i = 0; i < data.nodes.length; i++) {
       const sn = data.nodes[i];

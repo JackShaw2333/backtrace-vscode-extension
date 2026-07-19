@@ -76,6 +76,26 @@ export interface NavNode {
    * 为什么需要这个字段？深度裁剪时删掉最旧的叶子节点。
    */
   timestamp: number;
+
+  /**
+   * 调用者位置 —— 该节点是从父节点的哪个位置跳转过来的。
+   *
+   * 为什么需要这个字段？
+   *   父节点只记录了"跳转到的目标位置"（即父节点自身的 line/column），
+   *   但一个函数会调用许多子函数。当用户从 A.ts:50 用 F12 跳到 B.ts:20 时，
+   *   A 节点的 line 可能是 10（A 函数定义的起始位置），
+   *   而真正的调用点 A.ts:50 会丢失。
+   *   保存 callerPosition 后，新按钮"跳转到调用位置"可以把光标精确
+   *   送回到 A.ts:50，而不是 A 函数的初始位置 A.ts:10。
+   *
+   * 为什么是可选的（| null）？
+   *   - 根节点没有调用者 → null
+   *   - 旧持久化数据反序列化后无此字段 → null
+   *   UI 仅在该字段非空时显示调用行后缀和跳转按钮。
+   */
+  callerUri?: string | null;
+  callerLine?: number | null;
+  callerColumn?: number | null;
 }
 
 /**
@@ -117,6 +137,16 @@ export interface SerializedNavNode {
   childrenIndices: number[];
 
   timestamp: number;
+
+  /**
+   * 调用者位置（序列化版本）。
+   * 详见 NavNode.callerUri 的说明。
+   * 用 string | null / number | null 兼容旧数据：
+   *   旧 SerializedNavNode 没有这些字段 → deserialize 时用 ?? null 兜底。
+   */
+  callerUri?: string | null;
+  callerLine?: number | null;
+  callerColumn?: number | null;
 }
 
 /**
