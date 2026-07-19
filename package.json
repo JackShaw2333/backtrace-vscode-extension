@@ -29,6 +29,11 @@
       {
         "command": "backtrace.deleteNode",
         "title": "Backtrace: Delete Node"
+      },
+      {
+        "command": "backtrace.jumpToCaller",
+        "title": "Backtrace: Jump to Caller",
+        "icon": "$(arrow-left)"
       }
     ],
     "keybindings": [
@@ -109,6 +114,16 @@
         {
           "command": "backtrace.deleteNode",
           "when": "view == backtraceTree",
+          "group": "inline"
+        },
+        {
+          "command": "backtrace.jumpToCaller",
+          "when": "view == backtraceTree && viewItem != 'root'",
+          "group": "inline"
+        },
+        {
+          "command": "backtrace.jumpToCaller",
+          "when": "view == backtraceStack && viewItem != 'root'",
           "group": "inline"
         }
       ]
