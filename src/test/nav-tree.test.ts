@@ -228,4 +228,75 @@ suite('NavTree', () => {
     assert.strictEqual(tree2.root?.children.length, 2);
     assert.strictEqual(tree2.currentNode?.symbolName, 'a');
   });
+
+  // ── callerPosition 测试 ──────────────────────────────
+  test('addJump stores callerPosition on non-root nodes', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 10, 5, 'a');
+    // 从 a.ts:50 跳到 b.ts:20
+    tree.addJump('b.ts', 20, 3, 'b', '', { uri: 'a.ts', line: 50, column: 7 });
+    assert.strictEqual(tree.currentNode?.callerUri, 'a.ts');
+    assert.strictEqual(tree.currentNode?.callerLine, 50);
+    assert.strictEqual(tree.currentNode?.callerColumn, 7);
+  });
+
+  test('root node has null callerPosition', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 10, 5, 'a', '', { uri: 'ignored.ts', line: 999, column: 1 });
+    // 根节点没有调用者，即使传入了 callerPosition 也应为 null
+    assert.strictEqual(tree.root?.callerUri, null);
+    assert.strictEqual(tree.root?.callerLine, null);
+    assert.strictEqual(tree.root?.callerColumn, null);
+  });
+
+  test('serialize and deserialize preserves callerPosition', () => {
+    const tree = new NavTree(50);
+    tree.addJump('a.ts', 10, 5, 'a');
+    tree.addJump('b.ts', 20, 3, 'b', '', { uri: 'a.ts', line: 50, column: 7 });
+
+    const serialized = tree.serialize();
+    const tree2 = new NavTree(50);
+    tree2.deserialize(serialized);
+
+    const bNode = tree2.root?.children[0];
+    assert.strictEqual(bNode?.callerUri, 'a.ts');
+    assert.strictEqual(bNode?.callerLine, 50);
+    assert.strictEqual(bNode?.callerColumn, 7);
+  });
+
+  test('legacy data without caller fields deserializes to null', () => {
+    // 手动构造旧持久化数据（没有 caller* 字段）
+    const legacy: import('../nav-node').SerializedTree = {
+      nodes: [
+        {
+          uri: 'a.ts',
+          line: 10,
+          column: 5,
+          symbolName: 'a',
+          contextName: '',
+          parentIndex: null,
+          childrenIndices: [1],
+          timestamp: 0,
+        },
+        {
+          uri: 'b.ts',
+          line: 20,
+          column: 3,
+          symbolName: 'b',
+          contextName: '',
+          parentIndex: 0,
+          childrenIndices: [],
+          timestamp: 0,
+        },
+      ],
+      currentNodeIndex: 1,
+      maxDepth: 50,
+    };
+
+    const tree = new NavTree(50);
+    tree.deserialize(legacy);
+    assert.strictEqual(tree.root?.callerUri, null);
+    assert.strictEqual(tree.root?.children[0]?.callerUri, null);
+    assert.strictEqual(tree.root?.children[0]?.callerLine, null);
+  });
 });

@@ -68,6 +68,11 @@ export class NavTree {
     };
 
     if (!this.root) {
+      // 根节点没有调用者：即使 callerPosition 被传入也强制清空，
+      // 避免误把首次跳转前的位置当作"调用点"。
+      node.callerUri = null;
+      node.callerLine = null;
+      node.callerColumn = null;
       this.root = node;
       this.currentNode = node;
     } else if (this.currentNode) {
