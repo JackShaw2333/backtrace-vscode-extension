@@ -63,7 +63,12 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
     const item = new vscode.TreeItem(display);
 
     // description：标题右边的灰色文字，显示文件名:行号
-    item.description = `${this.shortFileName(element.uri)}:${element.line}`;
+    // 若节点记录了调用者位置，追加 "← from <父文件名>:<行号>"
+    // 方便回溯浏览时一眼看到"本节点是从父节点的哪一行跳过来的"。
+    const callerSuffix = element.callerUri && element.callerLine != null
+      ? `  ← from ${this.shortFileName(element.callerUri)}:${element.callerLine}`
+      : '';
+    item.description = `${this.shortFileName(element.uri)}:${element.line}${callerSuffix}`;
 
     // color：标题的颜色。'as any' 是 TypeScript 的类型断言（type assertion）：
     //   (item as any) 告诉 TypeScript "把 item 当作 any 类型处理"，
@@ -92,7 +97,13 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
     };
 
     // contextValue：用于上下文菜单和 when 表达式
-    item.contextValue = isCurrent ? 'currentNode' : 'node';
+    // 根节点设为 'root'（与底部面板一致），用于过滤掉"跳转到调用位置"
+    // 按钮——根节点没有调用者。
+    if (element === this.tree.root) {
+      item.contextValue = 'root';
+    } else {
+      item.contextValue = isCurrent ? 'currentNode' : 'node';
+    }
     return item;
   }
 

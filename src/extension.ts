@@ -23,6 +23,7 @@ import { PERSISTENCE_KEY } from './constants';
 import { registerGoBack } from './commands/go-back';
 import { registerGoForward } from './commands/go-forward';
 import { registerDeleteNode } from './commands/delete-node';
+import { registerJumpToCaller } from './commands/jump-to-caller';
 import { BacktracePathProvider, registerJumpCommand } from './providers/path-provider';
 import { BacktraceTreePanelProvider } from './providers/tree-panel-provider';
 
@@ -111,6 +112,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerGoBack(context, tree);
   registerGoForward(context, tree);
   registerDeleteNode(context, tree);
+  registerJumpToCaller(context, tree);
   registerJumpCommand(context, tree);
 
   // 6. 注册侧边栏堆栈视图

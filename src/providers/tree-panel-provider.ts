@@ -37,9 +37,13 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
     });
 
     // description: 当前节点加 ← current 后缀（高亮标识）
-    item.description = isCurrent
-      ? `${fileName}:${element.line}  ← current`
-      : `${fileName}:${element.line}`;
+    // 若节点记录了调用者位置，追加 "← from <父文件名>:<行号>"
+    // 用于回溯浏览时识别"本节点从父节点的哪一行跳过来"。
+    const callerSuffix = element.callerUri && element.callerLine != null
+      ? `  ← from ${fileName}:${element.callerLine}`
+      : '';
+    const currentMarker = isCurrent ? '  ← current' : '';
+    item.description = `${fileName}:${element.line}${callerSuffix}${currentMarker}`;
 
     // 文件颜色
     const colorIndex = this.getFileColorIndex(element.uri);
