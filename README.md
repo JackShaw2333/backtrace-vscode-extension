@@ -35,9 +35,14 @@ VSCode's built-in `Alt+←` navigates through *every* cursor movement — accide
 ## How It Works
 
 1. You press F12 (Go to Definition) or Ctrl+Click a symbol
-2. Backtrace captures your **pre-jump position** (the caller) and the **destination**
+2. Backtrace captures the **call-site** (the symbol reference you jumped from) and the **destination**
 3. A new node is added as a child of the current node in the tree
 4. Use `Ctrl+Alt+[` / `Ctrl+Alt+]` to walk back and forth through your exploration
+
+> **Tip:** For the most accurate call-site tracking, prefer **F12** over Ctrl+Click.
+> F12 requires the cursor to be on the symbol first, so Backtrace can precisely
+> record the call-site line. Ctrl+Click captures the click position when VSCode
+> reports it; otherwise it falls back to the parent node's recorded position.
 
 ## Views
 

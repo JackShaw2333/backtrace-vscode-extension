@@ -2,7 +2,10 @@
 
 ## 0.1.3
 
-- Fix Ctrl+Click recording wrong caller positions: use a small position history and filter out the intermediate click location (the symbol under the cursor) so the child node records the pre-click cursor line, not the clicked symbol line. Falls back to the parent's recorded position when no suitable candidate exists.
+- Fix caller position semantics: callerPosition now records the **call-site** (the symbol reference clicked/pointed at), not the cursor's previous location
+- F12 (keyboard): precisely captures the call-site since the cursor is already on the symbol
+- Ctrl+Click (mouse): uses the Mouse event position when VSCode reports it; falls back to the parent node's recorded position otherwise
+- README: added tip recommending F12 for the most accurate call-site tracking
 
 ## 0.1.2
 

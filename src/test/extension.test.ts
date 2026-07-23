@@ -76,77 +76,86 @@ suite('Backtrace Extension', () => {
     assert.strictEqual(cfg.forwardBehavior, 'quickpick');
   });
 
-  // ── pickCallerFromHistory 测试 ────────────────────────
-  // 验证 Ctrl+Click 场景下的 caller 挑选逻辑：
-  //   - 过滤掉"点击同文件符号"产生的污染（与目标行距离过近的候选）
-  //   - 找不到合适候选时回退到父节点的记录位置
-  suite('pickCallerFromHistory', () => {
-    test('filters out Ctrl+Click pollution on same-file symbol', () => {
+  // ── resolveCallerPosition 测试 ────────────────────────
+  // 验证调用点捕获策略：
+  //   - Ctrl+Click（有 Mouse 事件）→ 使用 Mouse 位置（被点击的符号）
+  //   - F12（无 Mouse 事件）→ 使用 lastKnownPosition（光标已在符号上）
+  //   - 兜底 → 父节点记录位置
+  suite('resolveCallerPosition', () => {
+    test('Ctrl+Click: uses Mouse event position as caller', () => {
       const tree = new NavTree(50);
       tree.addJump('a.ts', 10, 5, 'root');
       tree.addJump('b.ts', 20, 3, 'parent');
-      // 模拟：用户在 b.ts:80（真实 caller），Ctrl+Click b.ts:100 的符号，
-      // 跳转到 c.ts:200。Mouse 事件先把光标移到 b.ts:100（污染），
-      // 随后 Command 事件到 c.ts:200。
       const watcher = new CommandWatcher(tree);
-      watcher._setTestHistory([
-        { uri: 'b.ts', line: 80, column: 5 },   // 跳转前的真实位置
-        { uri: 'b.ts', line: 100, column: 12 }, // Ctrl+Click 点击处（污染）
-      ]);
-      const caller = watcher.pickCallerFromHistory({ uri: 'c.ts', line: 200, column: 1 });
-      assert.strictEqual(caller?.uri, 'b.ts');
-      assert.strictEqual(caller?.line, 80);
+      // 模拟 Ctrl+Click：Mouse 事件把光标移到 a.ts:100（被点击的符号）
+      watcher._setTestState({
+        lastMousePosition: { uri: 'a.ts', line: 100, column: 12 },
+        lastMouseAt: Date.now(),
+        lastKnownPosition: { uri: 'a.ts', line: 30, column: 1 },
+      });
+      const caller = watcher.resolveCallerPosition();
+      // 应使用 Mouse 位置（调用点），而非 lastKnownPosition
+      assert.strictEqual(caller?.uri, 'a.ts');
+      assert.strictEqual(caller?.line, 100);
     });
 
-    test('falls back to parent position when no candidate is suitable', () => {
+    test('F12: uses lastKnownPosition as caller', () => {
+      const tree = new NavTree(50);
+      tree.addJump('a.ts', 10, 5, 'root');
+      tree.addJump('b.ts', 20, 3, 'parent');
+      const watcher = new CommandWatcher(tree);
+      // 模拟 F12：无 Mouse 事件，光标已在符号上
+      watcher._setTestState({
+        lastMousePosition: null,
+        lastMouseAt: 0,
+        lastKnownPosition: { uri: 'b.ts', line: 50, column: 8 },
+      });
+      const caller = watcher.resolveCallerPosition();
+      assert.strictEqual(caller?.uri, 'b.ts');
+      assert.strictEqual(caller?.line, 50);
+    });
+
+    test('falls back to parent position when no other info', () => {
       const tree = new NavTree(50);
       tree.addJump('a.ts', 10, 5, 'parent');
       const watcher = new CommandWatcher(tree);
-      // 历史中只有与目标行很近的污染位置（b.ts:99 ≈ 目标 b.ts:100）
-      watcher._setTestHistory([
-        { uri: 'a.ts', line: 99, column: 1 },
-      ]);
-      const caller = watcher.pickCallerFromHistory({ uri: 'b.ts', line: 100, column: 1 });
-      // 无合适候选 → 回退到父节点
+      watcher._setTestState({
+        lastMousePosition: null,
+        lastMouseAt: 0,
+        lastKnownPosition: null,
+      });
+      const caller = watcher.resolveCallerPosition();
       assert.strictEqual(caller?.uri, 'a.ts');
       assert.strictEqual(caller?.line, 10);
     });
 
-    test('returns null when tree has no parent and history is empty', () => {
-      const tree = new NavTree(50);
-      const watcher = new CommandWatcher(tree);
-      watcher._setTestHistory([]);
-      const caller = watcher.pickCallerFromHistory({ uri: 'b.ts', line: 100, column: 1 });
-      assert.strictEqual(caller, null);
-    });
-
-    test('skips candidates from files other than parent file', () => {
+    test('stale Mouse event is ignored', () => {
       const tree = new NavTree(50);
       tree.addJump('a.ts', 10, 5, 'root');
       tree.addJump('b.ts', 20, 3, 'parent');
       const watcher = new CommandWatcher(tree);
-      // 历史中只有跨文件候选（c.ts），与父节点所在文件 b.ts 不同
-      watcher._setTestHistory([
-        { uri: 'c.ts', line: 50, column: 1 },
-      ]);
-      const caller = watcher.pickCallerFromHistory({ uri: 'd.ts', line: 200, column: 1 });
-      // 跨文件候选被跳过 → 回退到父节点位置
+      // Mouse 事件发生在很久以前（超过 300ms 窗口）
+      watcher._setTestState({
+        lastMousePosition: { uri: 'a.ts', line: 100, column: 12 },
+        lastMouseAt: Date.now() - 500,
+        lastKnownPosition: { uri: 'b.ts', line: 50, column: 8 },
+      });
+      const caller = watcher.resolveCallerPosition();
+      // 应忽略过期的 Mouse 事件，使用 lastKnownPosition
       assert.strictEqual(caller?.uri, 'b.ts');
-      assert.strictEqual(caller?.line, 20);
+      assert.strictEqual(caller?.line, 50);
     });
 
-    test('picks most recent suitable candidate', () => {
+    test('returns null when tree is empty and no position info', () => {
       const tree = new NavTree(50);
-      tree.addJump('a.ts', 10, 5, 'root');
-      tree.addJump('b.ts', 20, 3, 'parent');
       const watcher = new CommandWatcher(tree);
-      // 两个候选都在父节点文件 b.ts 且远离目标行 → 取最近的
-      watcher._setTestHistory([
-        { uri: 'b.ts', line: 30, column: 1 },
-        { uri: 'b.ts', line: 70, column: 1 },
-      ]);
-      const caller = watcher.pickCallerFromHistory({ uri: 'c.ts', line: 200, column: 1 });
-      assert.strictEqual(caller?.line, 70);
+      watcher._setTestState({
+        lastMousePosition: null,
+        lastMouseAt: 0,
+        lastKnownPosition: null,
+      });
+      const caller = watcher.resolveCallerPosition();
+      assert.strictEqual(caller, null);
     });
   });
 

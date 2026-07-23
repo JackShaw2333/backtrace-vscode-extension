@@ -15,16 +15,16 @@
  *   3. 记录跳转后位置，等待 120ms 防抖
  *   4. 确认位置稳定后写入 NavTree
  *
- * callerPosition 捕获策略（核心难点）：
- *   Ctrl+Click 会依次触发两个 selection 事件：
- *     ① kind=Mouse    → 光标移到被点击的符号（可能污染 lastKnownPosition）
- *     ② kind=Command  → 光标跳到定义所在位置
- *   仅靠单个 lastKnownPosition 无法还原跳转前的真实位置。
- *   本模块保留一个**小型位置历史**（最近 4 次事件），在 Command 事件
- *   触发时反向遍历，选取最佳候选：
- *     - 与父节点同文件
- *     - 且不在跳转目标行（±2 行，过滤掉"点击同文件符号"的污染）
- *   找不到则回退到父节点的记录位置，语义上"从父节点跳转过来"。
+ * callerPosition 捕获策略：
+ *   callerPosition 的语义是"调用点"——即被点击/光标所在的符号引用位置，
+ *   而不是"跳转前光标碰巧在哪"。
+ *
+ *   - F12（键盘触发）：光标已经在符号上，lastKnownPosition 就是调用点 ✓
+ *   - Ctrl+Click（鼠标触发）：VSCode 先触发 kind=Mouse 事件把光标移到
+ *     被点击的符号，再触发 kind=Command 跳到定义。Mouse 事件的位置就是
+ *     调用点。我们记录最近一次 Mouse 事件的位置，Command 事件优先使用它。
+ *     如果 Mouse 事件未被捕获（某些 VSCode 版本/配置），则兜底使用
+ *     父节点的记录位置。
  */
 
 import * as vscode from 'vscode';
@@ -34,10 +34,8 @@ import { CURSOR_STABILIZE_DELAY_MS } from './constants';
 import { getNodeContext } from './symbol-utils';
 import { isInternalNav } from './commands/navigate';
 
-/** 位置历史缓冲区大小 */
-const POSITION_HISTORY_SIZE = 4;
-/** caller 候选与目标行的最小行距（小于此值视为污染） */
-const CALLER_LINE_TOLERANCE = 2;
+/** Mouse 事件与 Command 事件之间的最大间隔（ms），超过则不认为是同一次 Ctrl+Click */
+const MOUSE_COMMAND_WINDOW_MS = 300;
 
 /** 暂存的跳转信息（等待防抖确认） */
 interface PendingCapture {
@@ -45,7 +43,7 @@ interface PendingCapture {
   toLine: number;
   toColumn: number;
   symbolName: string;
-  /** 跳转前光标位置（父节点的调用点），用于 callerPosition 字段 */
+  /** 调用点位置（被点击/光标所在的符号引用），用于 callerPosition 字段 */
   callerPosition: CallerPosition | null;
   timer: ReturnType<typeof setTimeout>;
 }
@@ -57,14 +55,22 @@ export class CommandWatcher {
   /** 内部导航发生的时间戳，用于甄别选择变化是否来自扩展自身 */
   private internalNavAt: number = 0;
   /**
-   * 最近几次光标位置（所有 selection 事件都会追加，最多保留 4 条）。
+   * 最近一次稳定的光标位置（任意 selection 事件都会更新它）。
    *
-   * 为什么需要历史而不是单个 lastKnownPosition？
-   *   Ctrl+Click 的 Mouse 事件会污染 lastKnownPosition 为"被点击的符号"，
-   *   使紧随其后的 Command 事件读到错误的 caller。保留最近几次位置后，
-   *   可以在 Command 事件触发时反向扫描，挑选出未被污染的真实 caller。
+   * F12 场景：光标已在符号上 → lastKnownPosition 就是调用点。
+   * Ctrl+Click 场景：可能被 Mouse 事件更新为点击位置（也是调用点），
+   * 也可能未被更新（取决于 VSCode 是否触发 Mouse selection 事件）。
    */
-  private positionHistory: CallerPosition[] = [];
+  private lastKnownPosition: CallerPosition | null = null;
+  /**
+   * 最近一次 Mouse 类型 selection 事件的位置和时间。
+   *
+   * Ctrl+Click 时 VSCode 会先触发 kind=Mouse 把光标移到被点击的符号，
+   * 这个位置就是调用点。Command 事件触发时检查此字段：
+   * 如果时间窗口内有过 Mouse 事件，说明是 Ctrl+Click，优先使用 Mouse 位置。
+   */
+  private lastMousePosition: CallerPosition | null = null;
+  private lastMouseAt: number = 0;
 
   constructor(private tree: NavTree) {}
 
@@ -89,41 +95,35 @@ export class CommandWatcher {
       const line = editor.selection.active.line + 1;
       const column = editor.selection.active.character + 1;
       const kind = event.kind;
-      const isCommand = kind === vscode.TextEditorSelectionChangeKind.Command;
 
       const currentPos: CallerPosition = { uri, line, column };
 
-      // 追加到历史缓冲区（避免与上一条重复才追加）
-      const last = this.positionHistory[this.positionHistory.length - 1];
-      if (!last || last.uri !== uri || last.line !== line || last.column !== column) {
-        this.positionHistory.push(currentPos);
-        if (this.positionHistory.length > POSITION_HISTORY_SIZE) {
-          this.positionHistory.shift();
-        }
+      // 更新 lastKnownPosition（所有事件都更新）
+      this.lastKnownPosition = currentPos;
+
+      // 记录 Mouse 事件的位置和时间（用于 Ctrl+Click 检测）
+      if (kind === vscode.TextEditorSelectionChangeKind.Mouse) {
+        this.lastMousePosition = currentPos;
+        this.lastMouseAt = Date.now();
       }
 
       // ── 判断是否来自扩展自身的导航 ──
-      // 如果 isInternalNav 标志在 300ms 内被设置过，
-      // 说明本次选择变化是由 navigateToNode（树点击/堆栈点击/后退/前进）触发的，
-      // 应当忽略，不记录到导航树。
       if (isInternalNav || Date.now() - this.internalNavAt < 300) {
         this.internalNavAt = 0;
         return;
       }
 
       if (kind === undefined) return;
-      if (!isCommand) return;
+      if (kind !== vscode.TextEditorSelectionChangeKind.Command) return;
 
-      // ── 从历史中挑选最佳 callerPosition ──
-      // F12/Ctrl+Click 可能触发多个连续的 Command 类型 selection 事件：
-      // 第一个事件的 callerPosition 来自跳转前的真实光标位置；
-      // 后续事件由于 lastKnownPosition 被污染，可能读到中间位置。
-      // 因此：如果已有 pending capture，复用第一次捕获的 callerPosition。
+      // ── 确定 callerPosition（调用点） ──
+      // F12/Ctrl+Click 可能触发多个连续的 Command 类型 selection 事件。
+      // 如果已有 pending capture，复用第一次捕获的 callerPosition。
       let effectiveCaller: CallerPosition | null;
       if (this.pending) {
         effectiveCaller = this.pending.callerPosition;
       } else {
-        effectiveCaller = this.pickCallerFromHistory(currentPos);
+        effectiveCaller = this.resolveCallerPosition();
       }
 
       const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active);
@@ -149,48 +149,46 @@ export class CommandWatcher {
   }
 
   /**
-   * 测试专用：手动注入位置历史，以便单元测试 pickCallerFromHistory。
-   * 生产代码不应调用此方法。
+   * 测试专用：手动设置内部状态，以便单元测试 resolveCallerPosition。
    */
-  _setTestHistory(history: CallerPosition[]): void {
-    this.positionHistory = [...history];
+  _setTestState(opts: {
+    lastKnownPosition?: CallerPosition | null;
+    lastMousePosition?: CallerPosition | null;
+    lastMouseAt?: number;
+  }): void {
+    if (opts.lastKnownPosition !== undefined) this.lastKnownPosition = opts.lastKnownPosition;
+    if (opts.lastMousePosition !== undefined) this.lastMousePosition = opts.lastMousePosition;
+    if (opts.lastMouseAt !== undefined) this.lastMouseAt = opts.lastMouseAt;
   }
 
   /**
-   * 从 positionHistory 中反向挑选最佳 callerPosition。
+   * 确定调用点位置（callerPosition）。
    *
-   * 选择标准：
-   *   1. 必须与父节点（currentNode）同文件；
-   *   2. 行号与跳转目标行距离 > CALLER_LINE_TOLERANCE（过滤掉 Ctrl+Click
-   *      同文件符号产生的"中间位置"污染）；
-   *   3. 反向扫描，取最近一条满足条件的。
-   *
-   * 找不到时回退到父节点的记录位置（语义：从父节点跳转过来）。
-   *
-   * @param destinationPos 跳转目标位置（Command 事件的当前光标位置）
+   * 策略：
+   *   1. 如果最近 MOUSE_COMMAND_WINDOW_MS 内有 Mouse 事件 → Ctrl+Click，
+   *      使用 Mouse 事件的位置（被点击的符号 = 调用点）。
+   *   2. 否则 → F12/键盘触发，光标已在符号上，
+   *      使用 lastKnownPosition（跳转前的光标位置 = 调用点）。
+   *   3. 兜底：使用父节点的记录位置。
    */
-  pickCallerFromHistory(destinationPos: CallerPosition): CallerPosition | null {
+  resolveCallerPosition(): CallerPosition | null {
     const parent = this.tree.currentNode;
 
-    // 反向扫描：从最近一条（Command 事件前一条）开始
-    for (let i = this.positionHistory.length - 1; i >= 0; i--) {
-      const candidate = this.positionHistory[i];
-
-      // 与父节点不同文件 → 跳过（跨文件跳转前的中间位置不应作为 caller）
-      if (parent && candidate.uri !== parent.uri) continue;
-
-      // 与跳转目标同文件且行距很近 → 视为污染（点击同文件符号的中间位置），跳过
-      if (
-        candidate.uri === destinationPos.uri
-        && Math.abs(candidate.line - destinationPos.line) <= CALLER_LINE_TOLERANCE
-      ) {
-        continue;
-      }
-
-      return candidate;
+    // Ctrl+Click 检测：最近有 Mouse 事件
+    if (this.lastMousePosition && Date.now() - this.lastMouseAt < MOUSE_COMMAND_WINDOW_MS) {
+      const mousePos = this.lastMousePosition;
+      // 消费掉，避免影响后续事件
+      this.lastMousePosition = null;
+      this.lastMouseAt = 0;
+      return mousePos;
     }
 
-    // 历史中没有合适候选 → 回退到父节点的记录位置
+    // F12/键盘触发：lastKnownPosition 就是调用点
+    if (this.lastKnownPosition) {
+      return this.lastKnownPosition;
+    }
+
+    // 兜底：父节点位置
     if (parent) {
       return { uri: parent.uri, line: parent.line, column: parent.column };
     }
