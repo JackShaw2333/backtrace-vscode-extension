@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Fix incorrect line positions on recorded nodes: use `event.textEditor` instead of `activeTextEditor` for cross-file jumps, and preserve callerPosition across debounced multi-event commands
+
 ## 0.1.1
 
 - Jump-to-caller button now appears first (more prominent) in tree panel inline actions

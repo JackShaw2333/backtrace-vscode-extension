@@ -71,9 +71,10 @@ export class CommandWatcher {
     this.config = config;
 
     this.disposable = vscode.window.onDidChangeTextEditorSelection((event) => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) return;
-
+      // 使用 event.textEditor 而非 vscode.window.activeTextEditor：
+      // 跨文件跳转时，selection 事件可能在 activeTextEditor 切换前触发，
+      // 此时 activeTextEditor 仍指向旧编辑器，读到错误的行列位置。
+      const editor = event.textEditor;
       const uri = editor.document.uri.toString();
       const line = editor.selection.active.line + 1;
       const column = editor.selection.active.character + 1;
@@ -96,16 +97,23 @@ export class CommandWatcher {
       if (event.kind === undefined) return;
       if (event.kind !== vscode.TextEditorSelectionChangeKind.Command) return;
 
+      // F12/Ctrl+Click 可能触发多个连续的 Command 类型 selection 事件。
+      // 第一个事件的 callerPosition（来自 lastKnownPosition）是用户真实的跳转前位置；
+      // 后续事件读到的 lastKnownPosition 已被第一个事件污染为中间位置。
+      // 因此：如果已有 pending capture（说明同一命令的多个事件正在防抖中），
+      // 复用第一次捕获的 callerPosition。
+      const effectiveCaller = this.pending ? this.pending.callerPosition : callerPosition;
+
       const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active);
       const word = wordRange ? editor.document.getText(wordRange) : '';
 
       if (this.pending) clearTimeout(this.pending.timer);
 
       const timer = setTimeout(() => {
-        this.finalizeCapture(uri, line, column, word, callerPosition);
+        this.finalizeCapture(uri, line, column, word, effectiveCaller);
       }, CURSOR_STABILIZE_DELAY_MS);
 
-      this.pending = { toUri: uri, toLine: line, toColumn: column, symbolName: word, callerPosition, timer };
+      this.pending = { toUri: uri, toLine: line, toColumn: column, symbolName: word, callerPosition: effectiveCaller, timer };
     });
   }
 
