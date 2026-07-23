@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Fix Ctrl+Click recording wrong caller positions: use a small position history and filter out the intermediate click location (the symbol under the cursor) so the child node records the pre-click cursor line, not the clicked symbol line. Falls back to the parent's recorded position when no suitable candidate exists.
+
 ## 0.1.2
 
 - Fix incorrect line positions on recorded nodes: use `event.textEditor` instead of `activeTextEditor` for cross-file jumps, and preserve callerPosition across debounced multi-event commands

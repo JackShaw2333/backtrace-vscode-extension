@@ -14,6 +14,17 @@
  *   2. 检查 event.kind === Command → 是命令触发的
  *   3. 记录跳转后位置，等待 120ms 防抖
  *   4. 确认位置稳定后写入 NavTree
+ *
+ * callerPosition 捕获策略（核心难点）：
+ *   Ctrl+Click 会依次触发两个 selection 事件：
+ *     ① kind=Mouse    → 光标移到被点击的符号（可能污染 lastKnownPosition）
+ *     ② kind=Command  → 光标跳到定义所在位置
+ *   仅靠单个 lastKnownPosition 无法还原跳转前的真实位置。
+ *   本模块保留一个**小型位置历史**（最近 4 次事件），在 Command 事件
+ *   触发时反向遍历，选取最佳候选：
+ *     - 与父节点同文件
+ *     - 且不在跳转目标行（±2 行，过滤掉"点击同文件符号"的污染）
+ *   找不到则回退到父节点的记录位置，语义上"从父节点跳转过来"。
  */
 
 import * as vscode from 'vscode';
@@ -22,6 +33,11 @@ import { BacktraceConfig } from './config';
 import { CURSOR_STABILIZE_DELAY_MS } from './constants';
 import { getNodeContext } from './symbol-utils';
 import { isInternalNav } from './commands/navigate';
+
+/** 位置历史缓冲区大小 */
+const POSITION_HISTORY_SIZE = 4;
+/** caller 候选与目标行的最小行距（小于此值视为污染） */
+const CALLER_LINE_TOLERANCE = 2;
 
 /** 暂存的跳转信息（等待防抖确认） */
 interface PendingCapture {
@@ -41,20 +57,14 @@ export class CommandWatcher {
   /** 内部导航发生的时间戳，用于甄别选择变化是否来自扩展自身 */
   private internalNavAt: number = 0;
   /**
-   * 最近一次稳定的光标位置（任意 selection 事件都会更新它）。
+   * 最近几次光标位置（所有 selection 事件都会追加，最多保留 4 条）。
    *
-   * 为什么需要它？
-   *   当 Command 类型事件（F12/Ctrl+Click）触发时，新节点应当记录
-   *   "从父节点的哪个位置跳转过来"。本字段在每次 selection 事件开头
-   *   快照一次，因此 Command 事件读取到的就是跳转前的光标位置。
-   *
-   * 为什么所有事件都更新它？
-   *   - 早返回路径（如 isInternalNav、kind !== Command）也应当更新，
-   *     否则下一次 Command 事件会拿到过期的位置。
-   *   - 例如用户用鼠标点了一下 B.ts:50，然后按 F12：必须把 B.ts:50
-   *     作为 callerPosition 记录下来。
+   * 为什么需要历史而不是单个 lastKnownPosition？
+   *   Ctrl+Click 的 Mouse 事件会污染 lastKnownPosition 为"被点击的符号"，
+   *   使紧随其后的 Command 事件读到错误的 caller。保留最近几次位置后，
+   *   可以在 Command 事件触发时反向扫描，挑选出未被污染的真实 caller。
    */
-  private lastKnownPosition: CallerPosition | null = null;
+  private positionHistory: CallerPosition[] = [];
 
   constructor(private tree: NavTree) {}
 
@@ -78,12 +88,19 @@ export class CommandWatcher {
       const uri = editor.document.uri.toString();
       const line = editor.selection.active.line + 1;
       const column = editor.selection.active.character + 1;
+      const kind = event.kind;
+      const isCommand = kind === vscode.TextEditorSelectionChangeKind.Command;
 
-      // 先快照调用者位置，再更新 lastKnownPosition。
-      // 这样 Command 事件拿到的是跳转前的光标位置，
-      // 而所有早返回路径（包括 isInternalNav）也都能更新 lastKnownPosition。
-      const callerPosition = this.lastKnownPosition;
-      this.lastKnownPosition = { uri, line, column };
+      const currentPos: CallerPosition = { uri, line, column };
+
+      // 追加到历史缓冲区（避免与上一条重复才追加）
+      const last = this.positionHistory[this.positionHistory.length - 1];
+      if (!last || last.uri !== uri || last.line !== line || last.column !== column) {
+        this.positionHistory.push(currentPos);
+        if (this.positionHistory.length > POSITION_HISTORY_SIZE) {
+          this.positionHistory.shift();
+        }
+      }
 
       // ── 判断是否来自扩展自身的导航 ──
       // 如果 isInternalNav 标志在 300ms 内被设置过，
@@ -94,15 +111,20 @@ export class CommandWatcher {
         return;
       }
 
-      if (event.kind === undefined) return;
-      if (event.kind !== vscode.TextEditorSelectionChangeKind.Command) return;
+      if (kind === undefined) return;
+      if (!isCommand) return;
 
-      // F12/Ctrl+Click 可能触发多个连续的 Command 类型 selection 事件。
-      // 第一个事件的 callerPosition（来自 lastKnownPosition）是用户真实的跳转前位置；
-      // 后续事件读到的 lastKnownPosition 已被第一个事件污染为中间位置。
-      // 因此：如果已有 pending capture（说明同一命令的多个事件正在防抖中），
-      // 复用第一次捕获的 callerPosition。
-      const effectiveCaller = this.pending ? this.pending.callerPosition : callerPosition;
+      // ── 从历史中挑选最佳 callerPosition ──
+      // F12/Ctrl+Click 可能触发多个连续的 Command 类型 selection 事件：
+      // 第一个事件的 callerPosition 来自跳转前的真实光标位置；
+      // 后续事件由于 lastKnownPosition 被污染，可能读到中间位置。
+      // 因此：如果已有 pending capture，复用第一次捕获的 callerPosition。
+      let effectiveCaller: CallerPosition | null;
+      if (this.pending) {
+        effectiveCaller = this.pending.callerPosition;
+      } else {
+        effectiveCaller = this.pickCallerFromHistory(currentPos);
+      }
 
       const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active);
       const word = wordRange ? editor.document.getText(wordRange) : '';
@@ -126,6 +148,55 @@ export class CommandWatcher {
     this.disposable = null;
   }
 
+  /**
+   * 测试专用：手动注入位置历史，以便单元测试 pickCallerFromHistory。
+   * 生产代码不应调用此方法。
+   */
+  _setTestHistory(history: CallerPosition[]): void {
+    this.positionHistory = [...history];
+  }
+
+  /**
+   * 从 positionHistory 中反向挑选最佳 callerPosition。
+   *
+   * 选择标准：
+   *   1. 必须与父节点（currentNode）同文件；
+   *   2. 行号与跳转目标行距离 > CALLER_LINE_TOLERANCE（过滤掉 Ctrl+Click
+   *      同文件符号产生的"中间位置"污染）；
+   *   3. 反向扫描，取最近一条满足条件的。
+   *
+   * 找不到时回退到父节点的记录位置（语义：从父节点跳转过来）。
+   *
+   * @param destinationPos 跳转目标位置（Command 事件的当前光标位置）
+   */
+  pickCallerFromHistory(destinationPos: CallerPosition): CallerPosition | null {
+    const parent = this.tree.currentNode;
+
+    // 反向扫描：从最近一条（Command 事件前一条）开始
+    for (let i = this.positionHistory.length - 1; i >= 0; i--) {
+      const candidate = this.positionHistory[i];
+
+      // 与父节点不同文件 → 跳过（跨文件跳转前的中间位置不应作为 caller）
+      if (parent && candidate.uri !== parent.uri) continue;
+
+      // 与跳转目标同文件且行距很近 → 视为污染（点击同文件符号的中间位置），跳过
+      if (
+        candidate.uri === destinationPos.uri
+        && Math.abs(candidate.line - destinationPos.line) <= CALLER_LINE_TOLERANCE
+      ) {
+        continue;
+      }
+
+      return candidate;
+    }
+
+    // 历史中没有合适候选 → 回退到父节点的记录位置
+    if (parent) {
+      return { uri: parent.uri, line: parent.line, column: parent.column };
+    }
+    return null;
+  }
+
   /** 120ms 防抖后确认跳转 */
   private async finalizeCapture(
     toUri: string,
@@ -134,6 +205,9 @@ export class CommandWatcher {
     symbolName: string,
     callerPosition: CallerPosition | null,
   ): Promise<void> {
+    // 先清空 pending，让下一次 selection 事件视为新命令的起点
+    this.pending = null;
+
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
 
