@@ -28,7 +28,8 @@
       },
       {
         "command": "backtrace.deleteNode",
-        "title": "Backtrace: Delete Node"
+        "title": "Backtrace: Delete Node",
+        "icon": "$(close)"
       },
       {
         "command": "backtrace.jumpToCaller",
@@ -112,14 +113,14 @@
     "menus": {
       "view/item/context": [
         {
-          "command": "backtrace.deleteNode",
-          "when": "view == backtraceTree",
-          "group": "inline"
-        },
-        {
           "command": "backtrace.jumpToCaller",
           "when": "view == backtraceTree && viewItem != 'root'",
-          "group": "inline"
+          "group": "inline@1"
+        },
+        {
+          "command": "backtrace.deleteNode",
+          "when": "view == backtraceTree",
+          "group": "inline@2"
         },
         {
           "command": "backtrace.jumpToCaller",
