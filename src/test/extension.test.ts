@@ -79,7 +79,7 @@ suite('Backtrace Extension', () => {
   // ── resolveCallerPosition 测试 ────────────────────────
   // 验证调用点捕获策略：
   //   - Ctrl+Click（有 Mouse 事件）→ 使用 Mouse 位置（被点击的符号）
-  //   - F12（无 Mouse 事件）→ 使用 lastKnownPosition（光标已在符号上）
+  //   - F12（无 Mouse 事件）→ 使用 prevKnown（跳转前的光标位置）
   //   - 兜底 → 父节点记录位置
   suite('resolveCallerPosition', () => {
     test('Ctrl+Click: uses Mouse event position as caller', () => {
@@ -91,26 +91,24 @@ suite('Backtrace Extension', () => {
       watcher._setTestState({
         lastMousePosition: { uri: 'a.ts', line: 100, column: 12 },
         lastMouseAt: Date.now(),
-        lastKnownPosition: { uri: 'a.ts', line: 30, column: 1 },
       });
-      const caller = watcher.resolveCallerPosition();
-      // 应使用 Mouse 位置（调用点），而非 lastKnownPosition
+      // prevKnown 是跳转前的光标位置（a.ts:30），但应被 Mouse 位置覆盖
+      const caller = watcher.resolveCallerPosition({ uri: 'a.ts', line: 30, column: 1 });
       assert.strictEqual(caller?.uri, 'a.ts');
       assert.strictEqual(caller?.line, 100);
     });
 
-    test('F12: uses lastKnownPosition as caller', () => {
+    test('F12: uses prevKnown (pre-jump position) as caller', () => {
       const tree = new NavTree(50);
       tree.addJump('a.ts', 10, 5, 'root');
       tree.addJump('b.ts', 20, 3, 'parent');
       const watcher = new CommandWatcher(tree);
-      // 模拟 F12：无 Mouse 事件，光标已在符号上
       watcher._setTestState({
         lastMousePosition: null,
         lastMouseAt: 0,
-        lastKnownPosition: { uri: 'b.ts', line: 50, column: 8 },
       });
-      const caller = watcher.resolveCallerPosition();
+      // F12：光标在 b.ts:50 的符号上，prevKnown = b.ts:50
+      const caller = watcher.resolveCallerPosition({ uri: 'b.ts', line: 50, column: 8 });
       assert.strictEqual(caller?.uri, 'b.ts');
       assert.strictEqual(caller?.line, 50);
     });
@@ -122,14 +120,13 @@ suite('Backtrace Extension', () => {
       watcher._setTestState({
         lastMousePosition: null,
         lastMouseAt: 0,
-        lastKnownPosition: null,
       });
-      const caller = watcher.resolveCallerPosition();
+      const caller = watcher.resolveCallerPosition(null);
       assert.strictEqual(caller?.uri, 'a.ts');
       assert.strictEqual(caller?.line, 10);
     });
 
-    test('stale Mouse event is ignored', () => {
+    test('stale Mouse event is ignored, falls back to prevKnown', () => {
       const tree = new NavTree(50);
       tree.addJump('a.ts', 10, 5, 'root');
       tree.addJump('b.ts', 20, 3, 'parent');
@@ -138,10 +135,9 @@ suite('Backtrace Extension', () => {
       watcher._setTestState({
         lastMousePosition: { uri: 'a.ts', line: 100, column: 12 },
         lastMouseAt: Date.now() - 500,
-        lastKnownPosition: { uri: 'b.ts', line: 50, column: 8 },
       });
-      const caller = watcher.resolveCallerPosition();
-      // 应忽略过期的 Mouse 事件，使用 lastKnownPosition
+      const caller = watcher.resolveCallerPosition({ uri: 'b.ts', line: 50, column: 8 });
+      // 应忽略过期的 Mouse 事件，使用 prevKnown
       assert.strictEqual(caller?.uri, 'b.ts');
       assert.strictEqual(caller?.line, 50);
     });
@@ -152,9 +148,8 @@ suite('Backtrace Extension', () => {
       watcher._setTestState({
         lastMousePosition: null,
         lastMouseAt: 0,
-        lastKnownPosition: null,
       });
-      const caller = watcher.resolveCallerPosition();
+      const caller = watcher.resolveCallerPosition(null);
       assert.strictEqual(caller, null);
     });
   });

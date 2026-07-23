@@ -98,7 +98,10 @@ export class CommandWatcher {
 
       const currentPos: CallerPosition = { uri, line, column };
 
-      // 更新 lastKnownPosition（所有事件都更新）
+      // 先快照跳转前的位置，再更新 lastKnownPosition。
+      // 顺序不能反：resolveCallerPosition 需要读到跳转前的位置（调用点），
+      // 如果先更新，F12 场景下读到的就是跳转目标（错误）。
+      const prevKnown = this.lastKnownPosition;
       this.lastKnownPosition = currentPos;
 
       // 记录 Mouse 事件的位置和时间（用于 Ctrl+Click 检测）
@@ -123,7 +126,7 @@ export class CommandWatcher {
       if (this.pending) {
         effectiveCaller = this.pending.callerPosition;
       } else {
-        effectiveCaller = this.resolveCallerPosition();
+        effectiveCaller = this.resolveCallerPosition(prevKnown);
       }
 
       const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active);
@@ -164,14 +167,16 @@ export class CommandWatcher {
   /**
    * 确定调用点位置（callerPosition）。
    *
+   * @param prevKnown 跳转前的光标位置快照（在更新 lastKnownPosition 之前捕获）
+   *
    * 策略：
    *   1. 如果最近 MOUSE_COMMAND_WINDOW_MS 内有 Mouse 事件 → Ctrl+Click，
    *      使用 Mouse 事件的位置（被点击的符号 = 调用点）。
    *   2. 否则 → F12/键盘触发，光标已在符号上，
-   *      使用 lastKnownPosition（跳转前的光标位置 = 调用点）。
+   *      使用 prevKnown（跳转前的光标位置 = 调用点）。
    *   3. 兜底：使用父节点的记录位置。
    */
-  resolveCallerPosition(): CallerPosition | null {
+  resolveCallerPosition(prevKnown: CallerPosition | null): CallerPosition | null {
     const parent = this.tree.currentNode;
 
     // Ctrl+Click 检测：最近有 Mouse 事件
@@ -183,9 +188,9 @@ export class CommandWatcher {
       return mousePos;
     }
 
-    // F12/键盘触发：lastKnownPosition 就是调用点
-    if (this.lastKnownPosition) {
-      return this.lastKnownPosition;
+    // F12/键盘触发：prevKnown 就是调用点
+    if (prevKnown) {
+      return prevKnown;
     }
 
     // 兜底：父节点位置
