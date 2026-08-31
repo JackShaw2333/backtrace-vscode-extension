@@ -1,5 +1,8 @@
 # Backtrace
 
+![VS Code](https://img.shields.io/badge/VS%20Code-1.82%2B-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+
 Tree-based navigation history for VSCode. Instead of a flat linear back-stack, Backtrace records your code exploration as a **tree** — every F12 / Ctrl+Click jump becomes a node, and you can backtrack or branch forward through your actual exploration trail.
 
 ## Why?
@@ -16,6 +19,19 @@ VSCode's built-in `Alt+←` navigates through *every* cursor movement — accide
 - **Multi-branch forward** — when multiple forward paths exist, choose via notification or QuickPick
 - **Persistence** — tree survives VSCode restarts (workspace-scoped)
 - **Delete nodes** — prune uninteresting branches with the inline × button
+
+## Requirements
+
+VS Code **1.82.0** or newer.
+
+## Install
+
+- **From the Marketplace**: search for `Backtrace` in the Extensions view, or install from
+  [marketplace.visualstudio.com](https://marketplace.visualstudio.com/items?itemName=jaredshaw.backtrace)
+- **From a VSIX**: download `backtrace-<version>.vsix` from the
+  [Releases](https://github.com/JackShaw2333/backtrace-vscode-extension/releases) page, then run
+  `code --install-extension backtrace-<version>.vsix`, or use
+  *Extensions → ⋯ → Install from VSIX…*
 
 ## Keyboard Shortcuts
 
@@ -48,6 +64,42 @@ VSCode's built-in `Alt+←` navigates through *every* cursor movement — accide
 
 - **Sidebar → Backtrace Stack**: shows the linear path from root to your current position
 - **Panel → Backtrace → Backtrace Tree**: shows the full tree with all branches; inline buttons let you jump to the caller site or delete a node
+
+## Known Limitations
+
+- **Only definition-style jumps are tracked.** F12 / Ctrl+Click (Go to Definition) is recorded;
+  Go to Implementation, Go to References, Peek Definition, breadcrumb jumps and search-result
+  clicks are not.
+- **Peek views are not captured.** VSCode has no stable "command executed" API, so detection goes
+  through `onDidChangeTextEditorSelection` with `event.kind === Command`. Navigations that do not
+  move the editor selection — most notably opening a Peek view — produce no event and are missed.
+- **Ctrl+Click call-sites can be approximate.** The call-site is taken from the `Mouse` selection
+  event VSCode emits before the jump, when it arrives within 300 ms. Otherwise Backtrace falls back
+  to the parent node's recorded position. F12 is always exact.
+- **History is workspace-scoped.** The tree is persisted per workspace and is not shared between
+  windows or workspaces.
+- **Depth is capped.** The tree stops growing at `backtrace.maxTreeDepth` (default 50).
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+```bash
+git clone https://github.com/JackShaw2333/backtrace-vscode-extension.git
+cd backtrace-vscode-extension
+npm install
+```
+
+Press `F5` in VSCode to launch an Extension Development Host with the extension loaded.
+
+| Script | Purpose |
+|--------|---------|
+| `npm run compile` | TypeScript build to `out/` |
+| `npm run watch` | Incremental build |
+| `npm run lint` | ESLint |
+| `npm run format` | Prettier |
+
+Please run `npm run compile` and `npm run lint` before opening a PR.
 
 ## License
 
