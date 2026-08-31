@@ -3,4 +3,5 @@ out/
 *.vsix
 .superpowers/
 .reasonix/
+.workbuddy/
 docs/

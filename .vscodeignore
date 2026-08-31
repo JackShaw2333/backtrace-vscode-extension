@@ -9,6 +9,7 @@ src/**
 tsconfig.json
 .reasonix/**
 .superpowers/**
+.workbuddy/**
 docs/**
 *.vsix
 out/test/**
