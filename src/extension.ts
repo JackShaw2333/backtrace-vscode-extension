@@ -10,13 +10,15 @@
  *   2. 从持久化存储恢复导航树
  *   3. 注册所有命令（goBack、goForward、内部命令）
  *   4. 注册 UI 视图（侧边栏堆栈、底部树面板）
- *   5. 启动命令监听器
- *   6. 监听配置变化
+ *   5. 启动定义拦截器（只放行"查定义类"跳转，过滤 Find / Outline 噪音）
+ *   6. 启动跳转确认器（确认落点稳定 + 命中意图后记入树）
+ *   7. 监听配置变化
  */
 
 import * as vscode from 'vscode';
 import { NavTree } from './nav-tree';
 import { NavNode } from './nav-node';
+import { DefinitionInterceptor } from './definition-interceptor';
 import { CommandWatcher } from './command-watcher';
 import { readConfig } from './config';
 import { PERSISTENCE_KEY } from './constants';
@@ -31,6 +33,7 @@ import { BacktraceTreePanelProvider } from './providers/tree-panel-provider';
 // 为什么放在函数外面？因为 deactivate() 也需要访问它们。
 // 在 activate() 中赋值，在 deactivate() 中清理。
 // 不能用 const，因为需要在 activate() 中赋值。
+let definitionInterceptor: DefinitionInterceptor;
 let commandWatcher: CommandWatcher;
 let pathProvider: BacktracePathProvider;
 let treeProvider: BacktraceTreePanelProvider;
@@ -128,25 +131,36 @@ export function activate(context: vscode.ExtensionContext) {
   treeView = vscode.window.createTreeView('backtraceTree', { treeDataProvider: treeProvider });
   context.subscriptions.push(treeView);
 
-  // 8. 启动命令监听器
-  commandWatcher = new CommandWatcher(tree);
-  commandWatcher.activate(config);
+  // 8. 启动定义拦截器（必须在确认器之前）
+  //    拦截器在 4 种定义 Provider 上蹲点，记下"用户查了定义"的意图。
+  //    确认器构造时需要它的引用，所以先创建它。
+  //    disposables 由拦截器自己持有（和确认器同一模式），
+  //    关闭时由下面的 deactivate() 统一释放。
+  definitionInterceptor = new DefinitionInterceptor();
+  definitionInterceptor.activate();
 
-  // 9. 监听 VSCode 设置变化
-  //    当用户修改 backtrace.* 设置时，自动重新加载配置。
-  //    不需要用户重启 VSCode。
+  // 9. 启动跳转确认器
+  //    确认器拿着光标落点来问拦截器：命中意图才是真跳转（记入树），
+  //    没命中（Find / Outline / 搜索点击）直接丢弃。
+  commandWatcher = new CommandWatcher(tree, definitionInterceptor);
+  commandWatcher.activate();
+
+  // 10. 监听 VSCode 设置变化
+  //     当用户修改 backtrace.* 设置时，自动重新加载配置。
+  //     不需要用户重启 VSCode。
+  //     注意：这里只更新 tree.maxDepth，不重启监听器——
+  //     拦截器和确认器的行为都不依赖用户设置（意图机制无配置项），
+  //     重启它们只会白白丢掉暂存的意图和防抖状态。
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('backtrace')) {
         const newConfig = readConfig();
         tree.maxDepth = newConfig.maxTreeDepth;
-        commandWatcher.deactivate();
-        commandWatcher.activate(newConfig);
       }
     }),
   );
 
-  // 10. 设置上下文变量，用于 package.json 中的 viewsWelcome 条件
+  // 11. 设置上下文变量，用于 package.json 中的 viewsWelcome 条件
   //     setContext 让 VSCode 知道当前树是否为空，
   //     为空时显示"帮助文字"引导用户使用。
   vscode.commands.executeCommand('setContext', 'backtrace.isEmpty', !tree.root);
@@ -162,7 +176,14 @@ function countNodes(node: import('./nav-node').NavNode): number {
   return count;
 }
 
-/** 扩展停用时的清理入口 */
+/**
+ * 扩展停用时的清理入口。
+ *
+ * 两个监听器都要停：拦截器注销 4 个 Provider 并清空暂存意图，
+ * 确认器取消 selection 监听并丢弃未确认的防抖。?. 是防止
+ * activate() 中途抛异常导致变量没赋值时，停用还安全。
+ */
 export function deactivate() {
+  definitionInterceptor?.deactivate();
   commandWatcher?.deactivate();
 }

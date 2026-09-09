@@ -4,7 +4,7 @@
 import * as assert from 'assert';
 import { NavTree } from '../nav-tree';
 import { BacktraceConfig } from '../config';
-import { CommandWatcher } from '../command-watcher';
+import { DefinitionInterceptor, DefinitionIntent, DEFINITION_INTENT_WINDOW_MS } from '../definition-interceptor';
 
 suite('Backtrace Extension', () => {
   test('NavTree handles empty tree gracefully', () => {
@@ -18,10 +18,10 @@ suite('Backtrace Extension', () => {
 
   test('NavTree prunes at maxDepth', () => {
     const tree = new NavTree(2);
-    tree.addJump('a.ts', 1, 1, 'a');  // depth 0
-    tree.addJump('b.ts', 2, 1, 'b');  // depth 1
-    tree.addJump('c.ts', 3, 1, 'c');  // depth 2 — still <= maxDepth(2)
-    tree.addJump('d.ts', 4, 1, 'd');  // depth 3 — exceeds maxDepth, triggers prune
+    tree.addJump('a.ts', 1, 1, 'a'); // depth 0
+    tree.addJump('b.ts', 2, 1, 'b'); // depth 1
+    tree.addJump('c.ts', 3, 1, 'c'); // depth 2 — still <= maxDepth(2)
+    tree.addJump('d.ts', 4, 1, 'd'); // depth 3 — exceeds maxDepth, triggers prune
     assert.ok(tree.root !== null);
     // After prune, oldest leaf was removed but root stays
     assert.strictEqual(tree.currentNode?.symbolName, 'd');
@@ -76,81 +76,92 @@ suite('Backtrace Extension', () => {
     assert.strictEqual(cfg.forwardBehavior, 'quickpick');
   });
 
-  // ── resolveCallerPosition 测试 ────────────────────────
-  // 验证调用点捕获策略：
-  //   - Ctrl+Click（有 Mouse 事件）→ 使用 Mouse 位置（被点击的符号）
-  //   - F12（无 Mouse 事件）→ 使用 prevKnown（跳转前的光标位置）
-  //   - 兜底 → 父节点记录位置
-  suite('resolveCallerPosition', () => {
-    test('Ctrl+Click: uses Mouse event position as caller', () => {
-      const tree = new NavTree(50);
-      tree.addJump('a.ts', 10, 5, 'root');
-      tree.addJump('b.ts', 20, 3, 'parent');
-      const watcher = new CommandWatcher(tree);
-      // 模拟 Ctrl+Click：Mouse 事件把光标移到 a.ts:100（被点击的符号）
-      watcher._setTestState({
-        lastMousePosition: { uri: 'a.ts', line: 100, column: 12 },
-        lastMouseAt: Date.now(),
-      });
-      // prevKnown 是跳转前的光标位置（a.ts:30），但应被 Mouse 位置覆盖
-      const caller = watcher.resolveCallerPosition({ uri: 'a.ts', line: 30, column: 1 });
-      assert.strictEqual(caller?.uri, 'a.ts');
-      assert.strictEqual(caller?.line, 100);
+  // ── DefinitionInterceptor 意图机制测试 ────────────────
+  // 验证"意图记录 + 落点对号入座"的过滤逻辑：
+  //   - 落点命中意图目标 → 返回意图（含精确调用点），意图被一次性消费
+  //   - 落点没命中（Outline / Find / 搜索点击）→ 返回 null，意图保留
+  //   - 过期意图（Peek 预览只看没跳留下的）→ 被淘汰，返回 null
+  // 说明：这里用 _injectTestIntent 手工构造"用户刚查过定义"的现场，
+  // 不需要真正的语言服务器；真正的 Provider 流程靠 F5 手工验证。
+  suite('DefinitionInterceptor', () => {
+    // 造一条意图的快捷函数：从 a.ts:50 查定义，目标是 b.ts:20。
+    // 为什么抽成函数？6 个用例都要造意图，避免复制粘贴一堆对象字面量。
+    function makeIntent(overrides: Partial<DefinitionIntent> = {}): DefinitionIntent {
+      return {
+        kind: 'definition',
+        caller: { uri: 'a.ts', line: 50, column: 7 },
+        targets: [{ uri: 'b.ts', line: 20, column: 3 }],
+        at: Date.now(),
+        ...overrides,
+      };
+    }
+
+    test('matching landing consumes the intent and returns its caller', () => {
+      const interceptor = new DefinitionInterceptor();
+      interceptor._injectTestIntent(makeIntent());
+      // 落点 b.ts:20 正好是意图目标 → 命中
+      const intent = interceptor.consumeIntentIfMatches('b.ts', 20);
+      assert.strictEqual(intent?.caller.uri, 'a.ts');
+      assert.strictEqual(intent?.caller.line, 50);
+      assert.strictEqual(intent?.kind, 'definition');
+      // 一次性消费：再问一次就没有了（防一次 F12 记多条）
+      assert.strictEqual(interceptor.consumeIntentIfMatches('b.ts', 20), null);
+      assert.strictEqual(interceptor._getIntentCount(), 0);
     });
 
-    test('F12: uses prevKnown (pre-jump position) as caller', () => {
-      const tree = new NavTree(50);
-      tree.addJump('a.ts', 10, 5, 'root');
-      tree.addJump('b.ts', 20, 3, 'parent');
-      const watcher = new CommandWatcher(tree);
-      watcher._setTestState({
-        lastMousePosition: null,
-        lastMouseAt: 0,
-      });
-      // F12：光标在 b.ts:50 的符号上，prevKnown = b.ts:50
-      const caller = watcher.resolveCallerPosition({ uri: 'b.ts', line: 50, column: 8 });
-      assert.strictEqual(caller?.uri, 'b.ts');
-      assert.strictEqual(caller?.line, 50);
+    test('non-matching landing returns null and keeps the intent', () => {
+      const interceptor = new DefinitionInterceptor();
+      interceptor._injectTestIntent(makeIntent());
+      // 落点 c.ts:99 不是查定义的目标（模拟 Outline 点击）→ 不命中
+      assert.strictEqual(interceptor.consumeIntentIfMatches('c.ts', 99), null);
+      // 意图还在：真正的定义跳转落点稍后才到，不能提前丢
+      assert.strictEqual(interceptor._getIntentCount(), 1);
+      // 真落点到了 → 命中
+      assert.ok(interceptor.consumeIntentIfMatches('b.ts', 20) !== null);
     });
 
-    test('falls back to parent position when no other info', () => {
-      const tree = new NavTree(50);
-      tree.addJump('a.ts', 10, 5, 'parent');
-      const watcher = new CommandWatcher(tree);
-      watcher._setTestState({
-        lastMousePosition: null,
-        lastMouseAt: 0,
-      });
-      const caller = watcher.resolveCallerPosition(null);
-      assert.strictEqual(caller?.uri, 'a.ts');
-      assert.strictEqual(caller?.line, 10);
+    test('expired intent is dropped (peek without jump leaves no trace)', () => {
+      const interceptor = new DefinitionInterceptor();
+      // 意图是很久以前记的（超过有效期）→ 模拟"Peek 看了但没跳"
+      interceptor._injectTestIntent(makeIntent({ at: Date.now() - DEFINITION_INTENT_WINDOW_MS - 100 }));
+      assert.strictEqual(interceptor.consumeIntentIfMatches('b.ts', 20), null);
+      assert.strictEqual(interceptor._getIntentCount(), 0);
     });
 
-    test('stale Mouse event is ignored, falls back to prevKnown', () => {
-      const tree = new NavTree(50);
-      tree.addJump('a.ts', 10, 5, 'root');
-      tree.addJump('b.ts', 20, 3, 'parent');
-      const watcher = new CommandWatcher(tree);
-      // Mouse 事件发生在很久以前（超过 300ms 窗口）
-      watcher._setTestState({
-        lastMousePosition: { uri: 'a.ts', line: 100, column: 12 },
-        lastMouseAt: Date.now() - 500,
-      });
-      const caller = watcher.resolveCallerPosition({ uri: 'b.ts', line: 50, column: 8 });
-      // 应忽略过期的 Mouse 事件，使用 prevKnown
-      assert.strictEqual(caller?.uri, 'b.ts');
-      assert.strictEqual(caller?.line, 50);
+    test('matches the newest intent when several are stored', () => {
+      const interceptor = new DefinitionInterceptor();
+      // 快速连按两次 F12：第一次目标 b.ts:20，第二次目标 d.ts:40
+      interceptor._injectTestIntent(makeIntent());
+      interceptor._injectTestIntent(
+        makeIntent({
+          kind: 'implementation',
+          caller: { uri: 'c.ts', line: 5, column: 1 },
+          targets: [{ uri: 'd.ts', line: 40, column: 2 }],
+        }),
+      );
+      // 第二次的落点先到 → 命中第二条（从新到旧找）
+      const intent = interceptor.consumeIntentIfMatches('d.ts', 40);
+      assert.strictEqual(intent?.kind, 'implementation');
+      assert.strictEqual(intent?.caller.uri, 'c.ts');
+      // 第一条还在，等它自己的落点
+      assert.strictEqual(interceptor._getIntentCount(), 1);
     });
 
-    test('returns null when tree is empty and no position info', () => {
-      const tree = new NavTree(50);
-      const watcher = new CommandWatcher(tree);
-      watcher._setTestState({
-        lastMousePosition: null,
-        lastMouseAt: 0,
-      });
-      const caller = watcher.resolveCallerPosition(null);
-      assert.strictEqual(caller, null);
+    test('column differences are tolerated (uri + line match only)', () => {
+      const interceptor = new DefinitionInterceptor();
+      interceptor._injectTestIntent(makeIntent());
+      // 只传 uri + line，不传 column：落点列和目标列有微小差异也算命中，
+      // 容忍各语言服务器返回的目标列与 VSCode 实际落点列的不一致。
+      assert.ok(interceptor.consumeIntentIfMatches('b.ts', 20) !== null);
+    });
+
+    test('clearIntents empties the store', () => {
+      const interceptor = new DefinitionInterceptor();
+      interceptor._injectTestIntent(makeIntent());
+      interceptor._injectTestIntent(makeIntent());
+      assert.strictEqual(interceptor._getIntentCount(), 2);
+      interceptor._clearIntents();
+      assert.strictEqual(interceptor._getIntentCount(), 0);
     });
   });
 
