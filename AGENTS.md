@@ -37,19 +37,21 @@ src/
 ├── extension.ts              # activate / deactivate
 ├── nav-tree.ts               # 树数据结构 + 持久化 + dump 日志
 ├── nav-node.ts               # NavNode 接口与序列化类型
-├── command-watcher.ts        # 导航拦截与位置捕获（onDidChangeTextEditorSelection）
-├── symbol-utils.ts           # 从文件位置提取函数/类上下文
+├── command-watcher.ts        # 跳转确认器（Command 意图命中后记入树，120ms 防抖）
+├── definition-interceptor.ts # 定义拦截器（4 种定义 Provider 上记录跳转意图）
+├── position-tracker.ts       # 位置跟随器（文档编辑时实时修正节点行列）
+├── symbol-utils.ts           # 符号上下文提取 + 跳转时重定位（按身份找位置）
 ├── config.ts                 # 设置读取
-├── constants.ts              # 常量（颜色、防抖时间、持久化 key）
+├── constants.ts              # 常量（颜色、防抖时间、持久化 key、STALE_COLOR）
 ├── providers/
-│   ├── path-provider.ts      # 侧边栏堆栈视图（扁平列表：root→currentNode）
-│   └── tree-panel-provider.ts # 底部面板树视图（完整展开树）
+│   ├── path-provider.ts      # 侧边栏堆栈视图（扁平列表：root→currentNode，stale 置灰）
+│   └── tree-panel-provider.ts # 底部面板树视图（完整展开树，stale 置灰）
 └── commands/
-    ├── go-back.ts            # 后退命令
-    ├── go-forward.ts         # 前进命令（多分支：notification / quickpick）
+    ├── go-back.ts            # 后退命令（先定位后跳转，stale 不断链）
+    ├── go-forward.ts         # 前进命令（多分支：notification / quickpick，先定位后跳转）
     ├── delete-node.ts        # 删除节点命令
-    ├── jump-to-caller.ts     # 跳转到调用位置（callerUri/callerLine）
-    └── navigate.ts           # 跳转到节点位置（isInternalNav 标志）
+    ├── jump-to-caller.ts     # 跳转到调用位置（callerUri/callerLine，笨跳无重定位）
+    └── navigate.ts           # 先定位后跳转唯一出口（isInternalNav 标志 + 自愈/stale）
 ```
 
 ### 关键模块
@@ -57,7 +59,10 @@ src/
 | 模块 | 职责 |
 |------|------|
 | `NavTree` | 树形数据结构（NavNode），含 parent/children 链接、addJump/goBack/goForward/removeNode、serialize/deserialize、dump 日志 |
-| `CommandWatcher` | 用 `onDidChangeTextEditorSelection`（event.kind === Command）拦截 F12/Ctrl+Click 跳转，捕获 callerPosition（调用点），120ms 防抖后确认并记录 |
+| `DefinitionInterceptor` | 在定义/声明/实现/类型定义 4 种 Provider 上记录跳转意图（调用点 + 候选目标），只放行定义类跳转，过滤 Find/Outline 噪音 |
+| `CommandWatcher` | 跳转确认器：`onDidChangeTextEditorSelection`（kind === Command）+ 120ms 防抖，落点命中意图才记入树，调用点取自意图（精确，无 Mouse 推测） |
+| `PositionTracker` | 位置跟随器：`onDidChangeTextDocument` 实时把位移换算到同文件节点（含调用点）；stale 判定权归跳转时重定位 |
+| `resolveNodePosition`（symbol-utils） | 跳转时重定位：按 symbolName + contextName 找回当前位置；三分支 found（自愈回写）/ unverifiable（信旧行号）/ missing（标 stale） |
 | `config` | 从 `vscode.workspace.getConfiguration('backtrace')` 读取设置 |
 | `BacktracePathProvider` | TreeDataProvider，侧边栏（id: `backtraceStack`）— 扁平列表显示 root→currentNode 线性路径 |
 | `BacktraceTreePanelProvider` | TreeDataProvider，底部面板（id: `backtraceTree`）— 完整展开树，右键 × 删除节点 |
@@ -79,6 +84,7 @@ interface NavNode {
   callerUri?: string | null
   callerLine?: number | null
   callerColumn?: number | null
+  stale?: boolean
 }
 
 interface NavTree {
@@ -91,12 +97,18 @@ interface NavTree {
 ### 核心流程
 
 ```
+定义 Provider 被调用 → DefinitionInterceptor 记录意图（调用点 + 候选目标）
 onDidChangeTextEditorSelection(event.kind === Command)
-  → 快照 lastKnownPosition（调用点）
-  → 检测 Ctrl+Click（300ms 内有 Mouse 事件 → 用 Mouse 位置作调用点）
   → 120ms 防抖确认光标稳定
-  → 获取符号上下文（DocumentSymbolProvider）
-  → push 为 currentNode 的子节点（含 callerPosition），currentNode 指向新节点
+  → 落点命中意图才记入树（调用点取自意图，精确）
+  → push 为 currentNode 的子节点，currentNode 指向新节点
+  → Find/Outline/搜索点击无意图，直接丢弃
+
+文档编辑 → PositionTracker 实时换算位移到同文件节点（含调用点）
+跳转（goBack/goForward/树点击）→ navigateToNodeResolved 先定位后跳转：
+  found → 自愈回写行列（去 stale）→ 跳新位置
+  unverifiable（无语言支持等）→ 信旧行号直接跳
+  missing → 标 stale + 置灰 + 提示，原地不动（不断链）
 
 backtrace.goBack  → currentNode = currentNode.parent（不删子节点）
 backtrace.goForward：

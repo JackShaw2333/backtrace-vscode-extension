@@ -181,7 +181,9 @@ export class NavTree {
     const fileName = (node.uri || '').split('/').pop() || (node.uri || '').split('\\').pop() || '';
     const label = node.contextName || node.symbolName || '(root)';
     const marker = node === this.currentNode ? ' <─ current' : '';
-    console.log(`[Backtrace] ${indent}├─ ${label} @ ${fileName}:${node.line} (${node.children.length} children)${marker}`);
+    console.log(
+      `[Backtrace] ${indent}├─ ${label} @ ${fileName}:${node.line} (${node.children.length} children)${marker}`,
+    );
     for (const child of node.children) {
       this._dumpNode(child, indent + '  ');
     }
@@ -210,6 +212,9 @@ export class NavTree {
       callerUri: node.callerUri ?? null,
       callerLine: node.callerLine ?? null,
       callerColumn: node.callerColumn ?? null,
+      // stale 省略时就是 undefined，JSON 里直接没这个键，省空间；
+      // 读回时用 ?? false 兜底（见 deserialize）。
+      stale: node.stale ?? false,
     }));
     return {
       nodes: serializedNodes,
@@ -233,6 +238,8 @@ export class NavTree {
       callerUri: sn.callerUri ?? null,
       callerLine: sn.callerLine ?? null,
       callerColumn: sn.callerColumn ?? null,
+      // 更老的数据没有 stale 字段 → ?? false 兜底，默认"没过期"
+      stale: sn.stale ?? false,
     }));
     for (let i = 0; i < data.nodes.length; i++) {
       const sn = data.nodes[i];

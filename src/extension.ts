@@ -12,7 +12,8 @@
  *   4. 注册 UI 视图（侧边栏堆栈、底部树面板）
  *   5. 启动定义拦截器（只放行"查定义类"跳转，过滤 Find / Outline 噪音）
  *   6. 启动跳转确认器（确认落点稳定 + 命中意图后记入树）
- *   7. 监听配置变化
+ *   7. 启动位置跟随器（源码编辑时实时修正节点行列，对抗漂移）
+ *   8. 监听配置变化
  */
 
 import * as vscode from 'vscode';
@@ -20,6 +21,7 @@ import { NavTree } from './nav-tree';
 import { NavNode } from './nav-node';
 import { DefinitionInterceptor } from './definition-interceptor';
 import { CommandWatcher } from './command-watcher';
+import { PositionTracker } from './position-tracker';
 import { readConfig } from './config';
 import { PERSISTENCE_KEY } from './constants';
 import { registerGoBack } from './commands/go-back';
@@ -35,6 +37,7 @@ import { BacktraceTreePanelProvider } from './providers/tree-panel-provider';
 // 不能用 const，因为需要在 activate() 中赋值。
 let definitionInterceptor: DefinitionInterceptor;
 let commandWatcher: CommandWatcher;
+let positionTracker: PositionTracker;
 let pathProvider: BacktracePathProvider;
 let treeProvider: BacktraceTreePanelProvider;
 // TreeView 引用：用于 reveal() 展开节点。
@@ -145,12 +148,20 @@ export function activate(context: vscode.ExtensionContext) {
   commandWatcher = new CommandWatcher(tree, definitionInterceptor);
   commandWatcher.activate();
 
-  // 10. 监听 VSCode 设置变化
+  // 10. 启动位置跟随器（机制 A：实时跟随编辑）
+  //     订阅文档变化，同文件节点（含调用点）的行列就地修正。
+  //     跳转时的重定位（机制 B）在 navigate.ts 里，无需在这里接线。
+  //     和上面两个一样：行为不依赖用户设置，disposables 自己持有，
+  //     关闭时由下面的 deactivate() 统一释放。
+  positionTracker = new PositionTracker(tree);
+  positionTracker.activate();
+
+  // 11. 监听 VSCode 设置变化
   //     当用户修改 backtrace.* 设置时，自动重新加载配置。
   //     不需要用户重启 VSCode。
   //     注意：这里只更新 tree.maxDepth，不重启监听器——
-  //     拦截器和确认器的行为都不依赖用户设置（意图机制无配置项），
-  //     重启它们只会白白丢掉暂存的意图和防抖状态。
+  //     三个监听器（拦截器/确认器/跟随器）的行为都不依赖用户设置，
+  //     重启它们只会白白丢掉暂存的意图、防抖和跟随状态。
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('backtrace')) {
@@ -160,7 +171,7 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  // 11. 设置上下文变量，用于 package.json 中的 viewsWelcome 条件
+  // 12. 设置上下文变量，用于 package.json 中的 viewsWelcome 条件
   //     setContext 让 VSCode 知道当前树是否为空，
   //     为空时显示"帮助文字"引导用户使用。
   vscode.commands.executeCommand('setContext', 'backtrace.isEmpty', !tree.root);
@@ -179,11 +190,13 @@ function countNodes(node: import('./nav-node').NavNode): number {
 /**
  * 扩展停用时的清理入口。
  *
- * 两个监听器都要停：拦截器注销 4 个 Provider 并清空暂存意图，
- * 确认器取消 selection 监听并丢弃未确认的防抖。?. 是防止
- * activate() 中途抛异常导致变量没赋值时，停用还安全。
+ * 三个监听器都要停：拦截器注销 4 个 Provider 并清空暂存意图，
+ * 确认器取消 selection 监听并丢弃未确认的防抖，
+ * 跟随器取消文档监听。?. 是防止 activate() 中途抛异常
+ * 导致变量没赋值时，停用还安全。
  */
 export function deactivate() {
   definitionInterceptor?.deactivate();
   commandWatcher?.deactivate();
+  positionTracker?.deactivate();
 }

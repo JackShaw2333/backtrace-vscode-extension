@@ -5,20 +5,19 @@
  *
  * 行为：根据当前节点的子节点数量决定
  * - 0 个 → 提示"没有前进位置"
- * - 1 个 → 直接进入（同步，无需用户选择）
+ * - 1 个 → 直接进入（无需用户选择）
  * - 多个 → 取决于 backtrace.forwardBehavior 设置：
  *     'notification'（默认）→ 状态栏提示，用户通过 UI 选择
  *     'quickpick'           → 弹出 QuickPick 列表让用户选择（异步，需要 await）
  *
- * 为什么 goForward 有 async 而 goBack 没有？
- *   导航树的特性：每个节点只有一个 parent（后退路径唯一），
- *   但可以有多个 children（前进路径可能分叉）。
- *   分叉时需要用户选 → showQuickPick 是异步的 → 需要 async/await。
+ * 跳转走 navigateToNodeResolved（先定位后跳转，见 navigate.ts），
+ * 所以回调是 async：重定位要等语言服务。stale 节点不断链，只提示不跳。
+ * （下面长注释讲的是"为什么等用户选择必须用异步"，新手必读，保留。）
  */
 
 import * as vscode from 'vscode';
 import { NavTree } from '../nav-tree';
-import { navigateToNode } from './navigate';
+import { navigateToNodeResolved } from './navigate';
 import { readConfig } from '../config';
 
 /** 注册前进命令 */
@@ -41,8 +40,10 @@ export function registerGoForward(context: vscode.ExtensionContext, tree: NavTre
   //   同步 = 站在柜台等厨师做完（阻塞，什么都不能干）
   //   异步 = 拿号回座等叫号（不阻塞，可以刷手机，号到了再去取餐）
   //
-  // 为什么 goBack 不需要 async？
-  //   后退直接执行跳转，不需要用户选择，没有"等待"环节。
+  // 为什么 goBack 和 goForward 都是 async？
+  //   两个原因：① 分叉时 showQuickPick 要等用户选择；
+  //   ② 跳转前 navigateToNodeResolved 要等语言服务做重定位。
+  //   落到 stale 节点时不断链：currentNode 照常移过去，只是不跳文件 + 提示。
   const disposable = vscode.commands.registerCommand('backtrace.goForward', async () => {
     const options = tree.getForwardOptions();
 
@@ -53,7 +54,7 @@ export function registerGoForward(context: vscode.ExtensionContext, tree: NavTre
 
     if (options.length === 1) {
       tree.goForward(0);
-      navigateToNode(options[0]);
+      await navigateToNodeResolved(options[0]);
       vscode.commands.executeCommand('backtrace._treeChanged');
       return;
     }
@@ -98,7 +99,7 @@ export function registerGoForward(context: vscode.ExtensionContext, tree: NavTre
 
         if (picked) {
           tree.goForward(picked.index);
-          navigateToNode(options[picked.index]);
+          await navigateToNodeResolved(options[picked.index]);
           vscode.commands.executeCommand('backtrace._treeChanged');
         }
         return;

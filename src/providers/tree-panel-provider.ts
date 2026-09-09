@@ -10,7 +10,7 @@
 import * as vscode from 'vscode';
 import { NavTree } from '../nav-tree';
 import { NavNode } from '../nav-node';
-import { FILE_COLORS } from '../constants';
+import { FILE_COLORS, STALE_COLOR } from '../constants';
 
 export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNode> {
   private _onDidChangeTreeData = new vscode.EventEmitter<NavNode | undefined>();
@@ -39,21 +39,31 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
     // description: 当前节点加 ← current 后缀（高亮标识）
     // 若节点记录了调用者位置，追加 "← from <父文件名>:<行号>"
     // 用于回溯浏览时识别"本节点从父节点的哪一行跳过来"。
-    const callerSuffix = element.callerUri && element.callerLine != null
-      ? `  ← from ${fileName}:${element.callerLine}`
-      : '';
+    const callerSuffix =
+      element.callerUri && element.callerLine != null ? `  ← from ${fileName}:${element.callerLine}` : '';
     const currentMarker = isCurrent ? '  ← current' : '';
-    item.description = `${fileName}:${element.line}${callerSuffix}${currentMarker}`;
+    // stale 后缀：和侧边栏同一格式（见 path-provider.ts），纯颜色不够，
+    // 色弱用户靠这段文字识别过期节点。
+    const staleSuffix = element.stale ? '  · stale' : '';
+    item.description = `${fileName}:${element.line}${callerSuffix}${currentMarker}${staleSuffix}`;
 
-    // 文件颜色
-    const colorIndex = this.getFileColorIndex(element.uri);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
+    // 过期节点置灰（覆盖文件彩色）+ tooltip 说明原因和"点击重试"。
+    // 和侧边栏同一规则，保证两个视图视觉一致。
+    if (element.stale) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (item as any).color = STALE_COLOR;
+      item.tooltip =
+        `Original symbol "${element.symbolName || '(symbol)'}" was not found in the current file.\n` +
+        `It may have been moved or deleted. Click to retry — it revives automatically if found again.`;
+    } else {
+      // 文件颜色
+      const colorIndex = this.getFileColorIndex(element.uri);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
+    }
 
     // 图标：当前节点用实心圆，其他用函数图标
-    item.iconPath = isCurrent
-      ? new vscode.ThemeIcon('circle-filled')
-      : new vscode.ThemeIcon('symbol-method');
+    item.iconPath = isCurrent ? new vscode.ThemeIcon('circle-filled') : new vscode.ThemeIcon('symbol-method');
 
     // 点击跳转
     item.command = {
@@ -70,9 +80,8 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
     // 没有设置这个属性的节点不会显示展开箭头，
     // VSCode 也不会为它们调用 getChildren → 子节点不可见。
     // Expanded：默认展开（底部面板目标：一眼看到完整树）
-    item.collapsibleState = element.children.length > 0
-      ? vscode.TreeItemCollapsibleState.Expanded
-      : vscode.TreeItemCollapsibleState.None;
+    item.collapsibleState =
+      element.children.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None;
 
     return item;
   }
@@ -84,7 +93,9 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
       console.log('[Backtrace] TreeView getChildren() → root');
       return [this.tree.root];
     }
-    console.log(`[Backtrace] TreeView getChildren(${element.symbolName || 'root'}) → ${element.children.length} children`);
+    console.log(
+      `[Backtrace] TreeView getChildren(${element.symbolName || 'root'}) → ${element.children.length} children`,
+    );
     return element.children;
   }
 

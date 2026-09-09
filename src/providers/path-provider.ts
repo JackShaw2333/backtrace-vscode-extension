@@ -12,8 +12,8 @@
 import * as vscode from 'vscode';
 import { NavTree } from '../nav-tree';
 import { NavNode } from '../nav-node';
-import { FILE_COLORS } from '../constants';
-import { navigateToNode } from '../commands/navigate';
+import { FILE_COLORS, STALE_COLOR } from '../constants';
+import { navigateToNodeResolved } from '../commands/navigate';
 
 export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
   /**
@@ -65,10 +65,14 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
     // description：标题右边的灰色文字，显示文件名:行号
     // 若节点记录了调用者位置，追加 "← from <父文件名>:<行号>"
     // 方便回溯浏览时一眼看到"本节点是从父节点的哪一行跳过来的"。
-    const callerSuffix = element.callerUri && element.callerLine != null
-      ? `  ← from ${this.shortFileName(element.callerUri)}:${element.callerLine}`
-      : '';
-    item.description = `${this.shortFileName(element.uri)}:${element.line}${callerSuffix}`;
+    const callerSuffix =
+      element.callerUri && element.callerLine != null
+        ? `  ← from ${this.shortFileName(element.callerUri)}:${element.callerLine}`
+        : '';
+    // stale 后缀：光靠灰色对色弱用户不友好，文字后缀是第二重信号。
+    // 和底部面板保持同一格式，两个视图看起来一致。
+    const staleSuffix = element.stale ? '  · stale' : '';
+    item.description = `${this.shortFileName(element.uri)}:${element.line}${callerSuffix}${staleSuffix}`;
 
     // color：标题的颜色。'as any' 是 TypeScript 的类型断言（type assertion）：
     //   (item as any) 告诉 TypeScript "把 item 当作 any 类型处理"，
@@ -82,9 +86,20 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
     //   @typescript-eslint/no-explicit-any 规则禁止使用 any，
     //   因为 any 会完全关闭类型检查——本应编译报错的代码也不会报错了。
     //   这里用 eslint-disable-next-line 禁用了这行检查，是故意为之。
-    const colorIndex = this.getFileColorIndex(element.uri);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
+    // 过期节点置灰：覆盖掉文件彩色，一眼区分。STALE_COLOR 选中灰的理由
+    // 见 constants.ts（深色/浅色主题都可读）。非过期节点走原来的文件彩色。
+    // tooltip 解释"为什么灰" + "点它会重试"，避免用户以为是 bug。
+    if (element.stale) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (item as any).color = STALE_COLOR;
+      item.tooltip =
+        `Original symbol "${element.symbolName || '(symbol)'}" was not found in the current file.\n` +
+        `It may have been moved or deleted. Click to retry — it revives automatically if found again.`;
+    } else {
+      const colorIndex = this.getFileColorIndex(element.uri);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
+    }
 
     // iconPath：节点图标。当前节点用箭头，其他用函数图标
     item.iconPath = isCurrent ? new vscode.ThemeIcon('arrow-right') : new vscode.ThemeIcon('symbol-method');
@@ -183,10 +198,11 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
  * 为什么需要单独注册？TreeItem.command 只能引用一个命令 ID。
  */
 export function registerJumpCommand(context: vscode.ExtensionContext, tree: NavTree): void {
-  const disposable = vscode.commands.registerCommand('backtrace._jumpToNode', (node: NavNode) => {
+  // async：树点击同样先定位后跳转（stale 节点只提示不跳，不断链）。
+  const disposable = vscode.commands.registerCommand('backtrace._jumpToNode', async (node: NavNode) => {
     if (!node) return;
     tree.currentNode = node; // 更新当前节点
-    navigateToNode(node); // 跳转
+    await navigateToNodeResolved(node); // 先定位后跳转
     vscode.commands.executeCommand('backtrace._treeChanged'); // 刷新 UI
   });
   context.subscriptions.push(disposable);

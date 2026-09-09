@@ -96,6 +96,23 @@ export interface NavNode {
   callerUri?: string | null;
   callerLine?: number | null;
   callerColumn?: number | null;
+
+  /**
+   * 是否过期（stale）。
+   *
+   * 什么叫"过期"？节点存的是符号在某个时刻的位置；后来源码变了
+   * （函数被删/改名/移走），跳转时按符号身份再也找不回它，
+   * 这个节点就过期了——旧行号指向的已经是别的代码。
+   *
+   * 过期节点不会自动删除（可能文件还会改回来，点它会重试定位，
+   * 成功则自动"复活"）。UI 上用置灰 + "· stale" 后缀标出，
+   * 后退/前进落到它时会停下并提示，而不是跳到错误的位置。
+   *
+   * 为什么是可选的（| undefined）？
+   *   - 新节点默认不过期（addJump 里不写就是 undefined，判定时按 false 处理）
+   *   - 旧持久化数据反序列化后无此字段 → deserialize 里用 ?? false 兜底
+   */
+  stale?: boolean;
 }
 
 /**
@@ -147,6 +164,13 @@ export interface SerializedNavNode {
   callerUri?: string | null;
   callerLine?: number | null;
   callerColumn?: number | null;
+
+  /**
+   * 是否过期（序列化版本）。
+   * 详见 NavNode.stale 的说明。
+   * 旧数据没有这个字段 → deserialize 时用 ?? false 兜底。
+   */
+  stale?: boolean;
 }
 
 /**

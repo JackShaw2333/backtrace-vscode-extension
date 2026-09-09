@@ -56,3 +56,14 @@ export const FILE_COLORS = [
   '#ce9178', // 橙色
   '#cca700', // 金色
 ];
+
+/**
+ * 过期（stale）节点的标题颜色。
+ *
+ * 为什么用灰色而不是删除线？
+ * TreeItem 没有原生删除线 API（strikeThrough 只存在于 git 面板的装饰），
+ * 灰色在深色/浅色主题下都可读，又和文件彩色一眼区分。
+ * 配合 description 的 "· stale" 后缀 + tooltip 说明，三重信号保证
+ * 可读性和区分度（纯颜色对色弱用户不友好，所以文字后缀不能省）。
+ */
+export const STALE_COLOR = '#808080'; // 中灰：深色/浅色主题都可读

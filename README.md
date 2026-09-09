@@ -18,6 +18,7 @@ VSCode's built-in `Alt+←` navigates through *every* cursor movement — accide
 - **Go Back / Go Forward** — keyboard-driven navigation through the tree
 - **Multi-branch forward** — when multiple forward paths exist, choose via notification or QuickPick
 - **Persistence** — tree survives VSCode restarts (workspace-scoped)
+- **Position tracking** — recorded locations follow source edits live and re-resolve by symbol on jump; unresolvable nodes are greyed out as stale instead of jumping to the wrong line
 - **Delete nodes** — prune uninteresting branches with the inline × button
 
 ## Requirements
@@ -67,15 +68,16 @@ VS Code **1.82.0** or newer.
 
 ## Known Limitations
 
-- **Only definition-style jumps are tracked.** F12 / Ctrl+Click (Go to Definition) is recorded;
-  Go to Implementation, Go to References, Peek Definition, breadcrumb jumps and search-result
-  clicks are not.
-- **Peek views are not captured.** VSCode has no stable "command executed" API, so detection goes
-  through `onDidChangeTextEditorSelection` with `event.kind === Command`. Navigations that do not
-  move the editor selection — most notably opening a Peek view — produce no event and are missed.
-- **Ctrl+Click call-sites can be approximate.** The call-site is taken from the `Mouse` selection
-  event VSCode emits before the jump, when it arrives within 300 ms. Otherwise Backtrace falls back
-  to the parent node's recorded position. F12 is always exact.
+- **Only definition-style jumps are tracked.** Go to Definition (F12 / Ctrl+Click),
+  Go to Declaration, Go to Implementation and Go to Type Definition are recorded;
+  Go to References, Peek Definition, breadcrumb jumps and search-result clicks are not.
+- **Peek views are not captured.** A definition lookup only becomes a node once the cursor
+  actually lands on a result. Opening a Peek view never moves the selection, so it is ignored.
+- **Call-sites are exact.** The call-site is taken from the position VSCode passes to the
+  definition provider, so F12 and Ctrl+Click are equally precise.
+- **Jump-to-Caller tracks live edits only.** Call-site lines shift as you edit open files,
+  but are not symbol-resolved on jump (a call-site is a line inside a function body, not a
+  symbol definition), so large out-of-session refactors may leave them slightly off.
 - **History is workspace-scoped.** The tree is persisted per workspace and is not shared between
   windows or workspaces.
 - **Depth is capped.** The tree stops growing at `backtrace.maxTreeDepth` (default 50).
