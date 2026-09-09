@@ -42,11 +42,13 @@
       {
         "command": "backtrace.goBack",
         "key": "ctrl+alt+[",
+        "mac": "ctrl+cmd+[",
         "when": "editorTextFocus"
       },
       {
         "command": "backtrace.goForward",
         "key": "ctrl+alt+]",
+        "mac": "ctrl+cmd+]",
         "when": "editorTextFocus"
       }
     ],

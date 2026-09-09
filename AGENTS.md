@@ -131,10 +131,13 @@ backtrace.goForward：
 
 ## 快捷键
 
-| 命令 | 默认快捷键 |
-|------|-----------|
-| `backtrace.goBack` | Ctrl+Alt+[ |
-| `backtrace.goForward` | Ctrl+Alt+] |
+| 命令 | Win/Linux | macOS |
+|------|-----------|-------|
+| `backtrace.goBack` | Ctrl+Alt+[ | Ctrl+Cmd+[ |
+| `backtrace.goForward` | Ctrl+Alt+] | Ctrl+Cmd+] |
+
+> Mac 说明：直译的 `Cmd+Opt+[` 与内置折叠（Fold/Unfold）冲突，
+> 故用无冲突的 `Ctrl+Cmd+[` / `]`（`package.json` 的 `mac` 字段覆盖）。
 
 ---
 

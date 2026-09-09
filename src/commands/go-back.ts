@@ -1,7 +1,7 @@
 /**
  * "后退"命令。
  *
- * 注册 backtrace.goBack 命令（默认快捷键 Ctrl+Alt+[ ）。
+ * 注册 backtrace.goBack 命令（默认快捷键 Ctrl+Alt+[ ，Mac 上是 Ctrl+Cmd+[ ）。
  * 功能：沿导航树的 parent 链向上回退一步。
  *
  * 跳转走 navigateToNodeResolved（先定位后跳转）：

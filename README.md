@@ -36,10 +36,14 @@ VS Code **1.82.0** or newer.
 
 ## Keyboard Shortcuts
 
-| Command | Default Keybinding |
-|---------|-------------------|
-| Backtrace: Go Back | `Ctrl+Alt+[` |
-| Backtrace: Go Forward | `Ctrl+Alt+]` |
+| Command | Windows / Linux | macOS |
+|---------|----------------|-------|
+| Backtrace: Go Back | `Ctrl+Alt+[` | `Ctrl+Cmd+[` |
+| Backtrace: Go Forward | `Ctrl+Alt+]` | `Ctrl+Cmd+]` |
+
+> **Why not `Cmd+Opt+[` on Mac?** That's VS Code's built-in Fold/Unfold shortcut.
+> The Mac bindings keep the same `[` / `]` pair and just swap `Alt` for `Cmd`,
+> following the usual Ctrl→Cmd platform convention without hijacking Fold.
 
 ## Settings
 
@@ -54,7 +58,7 @@ VS Code **1.82.0** or newer.
 1. You press F12 (Go to Definition) or Ctrl+Click a symbol
 2. Backtrace captures the **call-site** (the symbol reference you jumped from) and the **destination**
 3. A new node is added as a child of the current node in the tree
-4. Use `Ctrl+Alt+[` / `Ctrl+Alt+]` to walk back and forth through your exploration
+4. Use `Ctrl+Alt+[` / `Ctrl+Alt+]` (`Ctrl+Cmd+[` / `Ctrl+Cmd+]` on macOS) to walk back and forth through your exploration
 
 > **Tip:** For the most accurate call-site tracking, prefer **F12** over Ctrl+Click.
 > F12 requires the cursor to be on the symbol first, so Backtrace can precisely

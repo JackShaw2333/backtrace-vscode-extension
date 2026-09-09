@@ -1,7 +1,7 @@
 /**
  * "前进"命令。
  *
- * 注册 backtrace.goForward 命令（默认快捷键 Ctrl+Alt+] ）。
+ * 注册 backtrace.goForward 命令（默认快捷键 Ctrl+Alt+] ，Mac 上是 Ctrl+Cmd+] ）。
  *
  * 行为：根据当前节点的子节点数量决定
  * - 0 个 → 提示"没有前进位置"
