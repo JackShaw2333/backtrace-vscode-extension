@@ -2,7 +2,7 @@
   "name": "backtrace",
   "displayName": "Backtrace",
   "description": "Tree-based navigation history for VSCode — backtrack your exploration trail",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "jaredshaw",
   "repository": "https://github.com/JackShaw2333/backtrace-vscode-extension",
   "license": "MIT",
