@@ -144,6 +144,36 @@ export class NavTree {
     this.dump('removeNode');
   }
 
+  /**
+   * 在兄弟中上移 / 下移一位（行内 ↑/↓ 按钮用）。
+   *
+   * 只改 parent.children 数组里的顺序，不改 parent 指针。
+   * 顺序的意义：goForward 多分支 QuickPick 按数组顺序列出，
+   * 所以调序 = 调整前进选项的展示顺序。
+   *
+   * 注意：这里只做兄弟调序，不做跨父搬家——换父的拖拽功能已下线
+   * （见 git 历史 backup/drag-attempt 分支），别在这里加"搬家"逻辑。
+   *
+   * @param direction -1 = 上移（往数组头），+1 = 下移（往数组尾）
+   * @returns true = 真动了；false = 到顶/到底或无父（根），调用方提示即可
+   */
+  moveSibling(node: NavNode, direction: -1 | 1): boolean {
+    if (!node.parent) {
+      return false;
+    }
+    const siblings = node.parent.children;
+    const idx = siblings.indexOf(node);
+    const swapWith = idx + direction;
+    // 越界 = 已在最上/最下，无事发生（提示文案由命令层负责）。
+    if (idx === -1 || swapWith < 0 || swapWith >= siblings.length) {
+      return false;
+    }
+    siblings[idx] = siblings[swapWith];
+    siblings[swapWith] = node;
+    this.dump('moveSibling');
+    return true;
+  }
+
   private calcDepth(node: NavNode): number {
     let max = 0;
     for (const child of node.children) {

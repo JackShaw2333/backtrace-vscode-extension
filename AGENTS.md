@@ -2,7 +2,7 @@
 
 VSCode 扩展：用**树形导航**替代 VSCode 原生线性堆栈导航历史，仅记录有意义的导航跳转（F12/Ctrl+Click 等），支持后退/前进、侧边栏树视图、持久化。
 
-> **当前状态：v0.1.4** — 所有模块通过 tsc 编译 + eslint 检查 + 56 项 mocha 单测，已发布。
+> **当前状态：v0.2.0** — 所有模块通过 tsc 编译 + eslint 检查 + 74 项 mocha 单测，已发布。
 
 ---
 
@@ -46,11 +46,12 @@ src/
 ├── providers/
 │   ├── path-provider.ts      # 侧边栏堆栈视图（扁平列表：root→currentNode，stale 置灰）
 │   └── tree-panel-provider.ts # 底部面板树视图（完整展开树，stale 置灰）
-└── commands/
+└── commands/（注：换父拖拽已下线，留档在 backup/drag-attempt 分支）
     ├── go-back.ts            # 后退命令（先定位后跳转，stale 不断链）
     ├── go-forward.ts         # 前进命令（多分支：notification / quickpick，先定位后跳转）
     ├── delete-node.ts        # 删除节点命令
     ├── jump-to-caller.ts     # 跳转到调用位置（callerUri/callerLine，笨跳无重定位）
+    ├── move-node.ts          # 节点上移/下调（兄弟调序，影响前进 QuickPick 顺序）
     └── navigate.ts           # 先定位后跳转唯一出口（isInternalNav 标志 + 自愈/stale）
 ```
 
@@ -58,7 +59,7 @@ src/
 
 | 模块 | 职责 |
 |------|------|
-| `NavTree` | 树形数据结构（NavNode），含 parent/children 链接、addJump/goBack/goForward/removeNode、serialize/deserialize、dump 日志 |
+| `NavTree` | 树形数据结构（NavNode），含 parent/children 链接、addJump/goBack/goForward/removeNode/moveSibling、serialize/deserialize、dump 日志 |
 | `DefinitionInterceptor` | 在定义/声明/实现/类型定义 4 种 Provider 上记录跳转意图（调用点 + 候选目标），只放行定义类跳转，过滤 Find/Outline 噪音 |
 | `CommandWatcher` | 跳转确认器：`onDidChangeTextEditorSelection`（kind === Command）+ 120ms 防抖，落点命中意图才记入树，调用点取自意图（精确，无 Mouse 推测） |
 | `PositionTracker` | 位置跟随器：`onDidChangeTextDocument` 实时把位移换算到同文件节点（含调用点）；stale 判定权归跳转时重定位 |
@@ -68,6 +69,7 @@ src/
 | `BacktraceTreePanelProvider` | TreeDataProvider，底部面板（id: `backtraceTree`）— 完整展开树，右键 × 删除节点 |
 | `goBack/goForward` | 注册 `backtrace.goBack` / `backtrace.goForward` 命令 |
 | `jumpToCaller` | 注册 `backtrace.jumpToCaller` 命令 — 跳转到节点的 callerUri/callerLine 位置 |
+| `moveNodeUp/moveNodeDown` | 注册 `backtrace.moveNodeUp` / `backtrace.moveNodeDown` — 行内 ↑/↓ 按钮兄弟调序（move-node.ts） |
 
 ### 数据结构
 

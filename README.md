@@ -20,6 +20,7 @@ VSCode's built-in `Alt+←` navigates through *every* cursor movement — accide
 - **Persistence** — tree survives VSCode restarts (workspace-scoped)
 - **Position tracking** — recorded locations follow source edits live and re-resolve by symbol on jump; unresolvable nodes are greyed out as stale instead of jumping to the wrong line
 - **Delete nodes** — prune uninteresting branches with the inline × button
+- **Reorder siblings** — use the inline ↑ / ↓ buttons in the bottom panel to reorder siblings (forward QuickPick order follows)
 
 ## Requirements
 
@@ -68,7 +69,7 @@ VS Code **1.82.0** or newer.
 ## Views
 
 - **Sidebar → Backtrace Stack**: shows the linear path from root to your current position
-- **Panel → Backtrace → Backtrace Tree**: shows the full tree with all branches; inline buttons let you jump to the caller site or delete a node
+- **Panel → Backtrace → Backtrace Tree**: shows the full tree with all branches; inline buttons let you reorder siblings (↑ / ↓), jump to the caller site or delete a node
 
 ## Known Limitations
 

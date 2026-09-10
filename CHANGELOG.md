@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Reorder siblings with the inline ↑ / ↓ buttons in the bottom panel (forward QuickPick order follows the new order)
+
 ## 0.1.4
 
 - Track only definition-style jumps: Definition / Declaration / Implementation / Type Definition providers record a jump intent, so Find matches, Outline clicks and search-result clicks no longer pollute the tree (replaces the old Mouse-event call-site heuristic — call-sites are now exact for both F12 and Ctrl+Click)

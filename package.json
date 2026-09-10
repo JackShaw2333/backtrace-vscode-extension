@@ -2,7 +2,7 @@
   "name": "backtrace",
   "displayName": "Backtrace",
   "description": "Tree-based navigation history for VSCode — backtrack your exploration trail",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "publisher": "jaredshaw",
   "repository": "https://github.com/JackShaw2333/backtrace-vscode-extension",
   "license": "MIT",
@@ -36,6 +36,16 @@
         "command": "backtrace.jumpToCaller",
         "title": "Backtrace: Jump to Caller",
         "icon": "$(arrow-left)"
+      },
+      {
+        "command": "backtrace.moveNodeUp",
+        "title": "Backtrace: Move Node Up",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "backtrace.moveNodeDown",
+        "title": "Backtrace: Move Node Down",
+        "icon": "$(arrow-down)"
       }
     ],
     "keybindings": [
@@ -116,14 +126,24 @@
     "menus": {
       "view/item/context": [
         {
-          "command": "backtrace.jumpToCaller",
+          "command": "backtrace.moveNodeUp",
           "when": "view == backtraceTree && viewItem != 'root'",
           "group": "inline@1"
         },
         {
+          "command": "backtrace.moveNodeDown",
+          "when": "view == backtraceTree && viewItem != 'root'",
+          "group": "inline@2"
+        },
+        {
+          "command": "backtrace.jumpToCaller",
+          "when": "view == backtraceTree && viewItem != 'root'",
+          "group": "inline@3"
+        },
+        {
           "command": "backtrace.deleteNode",
           "when": "view == backtraceTree",
-          "group": "inline@2"
+          "group": "inline@4"
         },
         {
           "command": "backtrace.jumpToCaller",
