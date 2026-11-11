@@ -40,6 +40,13 @@ export function registerJumpToCaller(context: vscode.ExtensionContext, tree: Nav
     // 更新 currentNode 到父节点（与 goBack 行为一致）
     if (node.parent) {
       tree.currentNode = node.parent;
+      // 多根森林：父节点可能在别的树里（例如从底部面板点了非活动根
+      // 节点的“跳转到调用位置”），活动根要跟着 current 一起切过去，
+      // 否则侧边栏路径/后续新增节点会落在错误的上下文。
+      const root = tree.rootOf(node.parent);
+      if (root) {
+        tree.setActiveRoot(root);
+      }
     }
     // 跳转到父节点的调用位置（而非父节点函数的初始位置）
     navigateToNode({
