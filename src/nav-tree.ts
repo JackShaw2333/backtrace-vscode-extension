@@ -330,10 +330,17 @@ export class NavTree {
         if (removable.length === 0) break;
         removable.sort((a, b) => a.timestamp - b.timestamp);
         const target = removable[0];
-        if (!target.parent) break;
-        const idx = target.parent.children.indexOf(target);
+        const parent = target.parent;
+        if (!parent) break;
+        const idx = parent.children.indexOf(target);
         if (idx !== -1) {
-          target.parent.children.splice(idx, 1);
+          parent.children.splice(idx, 1);
+          // 被裁掉的正好是 current 时回退到父节点：否则 currentNode
+          // 会指向已脱离森林的幽灵节点，serialize 丢 currentNodeIndex、
+          // 侧边栏显示不在树里的路径。
+          if (target === this.currentNode) {
+            this.currentNode = parent;
+          }
         }
       }
     }

@@ -23,8 +23,12 @@ suite('Backtrace Extension', () => {
     tree.addJump('c.ts', 3, 1, 'c'); // depth 2 — still <= maxDepth(2)
     tree.addJump('d.ts', 4, 1, 'd'); // depth 3 — exceeds maxDepth, triggers prune
     assert.ok(tree.root !== null);
-    // After prune, oldest leaf was removed but root stays
-    assert.strictEqual(tree.currentNode?.symbolName, 'd');
+    // 裁剪删掉的是 current（最旧叶子 d），current 应回退到父节点 c，
+    // 而不是继续指向已脱离森林的 d；根 a 保持不变。
+    assert.strictEqual(tree.currentNode?.symbolName, 'c');
+    const restored = new NavTree(50);
+    restored.deserialize(tree.serialize());
+    assert.strictEqual(restored.currentNode?.symbolName, 'c');
   });
 
   test('Backwards navigation after tree modification', () => {
