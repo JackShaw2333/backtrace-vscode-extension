@@ -38,8 +38,21 @@ export const DEFAULT_FORWARD_BEHAVIOR = 'notification' as const;
 /** 前进行为可选值 */
 export type ForwardBehavior = 'notification' | 'quickpick';
 
-/** 在 VSCode 的 workspaceState（按 workspace 隔离的存储）中保存导航树的键名 */
+/**
+ * 旧版（单根）持久化键名，保留只读兼容。
+ * 新版本只读取它做迁移，不再往它写入。
+ */
 export const PERSISTENCE_KEY = 'backtrace.navTree';
+
+/**
+ * 多根森林（v2）持久化键名。
+ *
+ * 为什么不覆盖旧 key？
+ *   旧版本扩展读到 v2 数据后如果再次保存，会按单根格式重写并丢掉其它根
+ *   （不可逆数据丢失）。换新 key 后，降级回旧版本最多“看不见”新数据，
+ *   但不会破坏它；新版本读取时先读 v2，没有才回退旧 key。
+ */
+export const PERSISTENCE_KEY_V2 = 'backtrace.navTree.v2';
 
 /**
  * 文件颜色调色板。

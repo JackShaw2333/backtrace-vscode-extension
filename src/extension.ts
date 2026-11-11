@@ -23,7 +23,7 @@ import { DefinitionInterceptor } from './definition-interceptor';
 import { CommandWatcher } from './command-watcher';
 import { PositionTracker } from './position-tracker';
 import { readConfig } from './config';
-import { PERSISTENCE_KEY } from './constants';
+import { PERSISTENCE_KEY, PERSISTENCE_KEY_V2 } from './constants';
 import { registerGoBack } from './commands/go-back';
 import { registerGoForward } from './commands/go-forward';
 import { registerDeleteNode } from './commands/delete-node';
@@ -67,7 +67,11 @@ export function activate(context: vscode.ExtensionContext) {
   //    这是 TypeScript 的高级用法：获取 serialize() 的返回值类型。
   //    这样保证存储和读取的类型一致。
   if (config.persistHistory) {
-    const saved = context.workspaceState.get<ReturnType<typeof tree.serialize>>(PERSISTENCE_KEY);
+    // 先读 v2（多根森林）；没有才回退旧 key（单根数据，v1 兼容迁移）。
+    // 为什么是“回退”而不是合并？旧 key 只可能是单根数据，迁移一次即可；
+    // 之后所有写入都走 v2，旧 key 保持原样作为降级备份，不删除。
+    const savedV2 = context.workspaceState.get<ReturnType<typeof tree.serialize>>(PERSISTENCE_KEY_V2);
+    const saved = savedV2 ?? context.workspaceState.get<ReturnType<typeof tree.serialize>>(PERSISTENCE_KEY);
     if (saved) {
       tree.deserialize(saved);
     }
@@ -110,7 +114,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (!readConfig().persistHistory) return;
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
-      context.workspaceState.update(PERSISTENCE_KEY, tree.serialize());
+      context.workspaceState.update(PERSISTENCE_KEY_V2, tree.serialize());
     }, 500);
   });
   context.subscriptions.push(persistHandler);
