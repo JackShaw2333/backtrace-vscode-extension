@@ -176,13 +176,14 @@ export class PositionTracker {
    * @returns true = 至少一个数字变了（调用方据此决定要不要刷新 UI）
    */
   _applyChanges(uri: string, changes: TextChange[]): boolean {
-    if (!this.tree.root || changes.length === 0) {
+    if (this.tree.roots.length === 0 || changes.length === 0) {
       return false;
     }
     let moved = false;
     // BFS 走全树：树一般只有几十个节点，全遍历比建索引简单得多，
     // 也比"按文件建 Map 并维护一致性"少一堆 bug 面。别过早优化。
-    const queue: NavNode[] = [this.tree.root];
+    // 多根森林：从所有根出发做 BFS，其它树的节点/调用点也要跟随编辑。
+    const queue: NavNode[] = [...this.tree.roots];
     while (queue.length > 0) {
       const node = queue.shift()!;
       // 节点自身位置

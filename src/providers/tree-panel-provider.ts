@@ -1,11 +1,13 @@
 /**
  * 底部树视图面板（Panel → "Backtrace Tree"）。
  *
- * 作为 TreeDataProvider 显示导航树的完整结构。
- * 区别于侧边栏路径视图（只显示单一路径），
- * 底部面板展开所有分支，完整展示导航树的全局结构。
+ * 多根森林下，这个视图是“全局地图”：
+ *   - 顶层返回 tree.roots（每个根一棵树，顺序 = 用户创建顺序）；
+ *   - 每个根用 home 图标 + "root ·" 前缀区分，并允许重命名；
+ *   - 子节点展开/折叠与旧版一致，右键菜单提供提升为根/删除等操作。
  *
- * 删除操作通过右键菜单上下文（view/item/context）触发。
+ * 区别于侧边栏路径视图（只显示活动根→currentNode 的线性路径），
+ * 底部面板展开所有根、所有分支，完整展示整个探索森林。
  */
 import * as vscode from 'vscode';
 import { NavTree } from '../nav-tree';
@@ -16,6 +18,16 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
   private _onDidChangeTreeData = new vscode.EventEmitter<NavNode | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
+  /**
+   * 节点 → 稳定 TreeItem.id。
+   *
+   * 为什么需要稳定 id？VSCode 用 id 保存展开/选中状态；没有 id 时
+   * 每次 refresh 都视为新元素，展开状态会丢。WeakMap 的键随节点对象
+   * 释放，不会阻止 GC。
+   */
+  private nodeIds = new WeakMap<NavNode, string>();
+  private nextNodeId = 0;
+
   constructor(private tree: NavTree) {}
 
   refresh(): void {
@@ -24,28 +36,28 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
   }
 
   getTreeItem(element: NavNode): vscode.TreeItem {
+    const isRoot = element.parent === null;
     const isCurrent = element === this.tree.currentNode;
-    const display = element.contextName || element.symbolName || '(root)';
+    // 根优先显示用户自定义 label；否则回退到符号上下文（Class#method）。
+    const display = element.label || element.contextName || element.symbolName || '(root)';
     const fileName = this.shortFileName(element.uri);
 
-    // label: 直接使用函数/符号名
-    const label = display;
-
     const item = new vscode.TreeItem({
-      label,
+      label: display,
       highlights: undefined,
     });
+    item.id = this.idOf(element);
 
-    // description: 当前节点加 ← current 后缀（高亮标识）
-    // 若节点记录了调用者位置，追加 "← from <父文件名>:<行号>"
-    // 用于回溯浏览时识别"本节点从父节点的哪一行跳过来"。
+    // description: 当前节点加 ← current 后缀；根加 "root ·" 前缀；
+    // 若节点记录了调用者位置，追加 "← from <父文件名>:<行号>"。
     const callerSuffix =
       element.callerUri && element.callerLine != null ? `  ← from ${fileName}:${element.callerLine}` : '';
     const currentMarker = isCurrent ? '  ← current' : '';
     // stale 后缀：和侧边栏同一格式（见 path-provider.ts），纯颜色不够，
     // 色弱用户靠这段文字识别过期节点。
     const staleSuffix = element.stale ? '  · stale' : '';
-    item.description = `${fileName}:${element.line}${callerSuffix}${currentMarker}${staleSuffix}`;
+    const rootPrefix = isRoot ? 'root · ' : '';
+    item.description = `${rootPrefix}${fileName}:${element.line}${callerSuffix}${currentMarker}${staleSuffix}`;
 
     // 过期节点置灰（覆盖文件彩色）+ tooltip 说明原因和"点击重试"。
     // 和侧边栏同一规则，保证两个视图视觉一致。
@@ -62,8 +74,12 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
       (item as any).color = FILE_COLORS[colorIndex % FILE_COLORS.length];
     }
 
-    // 图标：当前节点用实心圆，其他用函数图标
-    item.iconPath = isCurrent ? new vscode.ThemeIcon('circle-filled') : new vscode.ThemeIcon('symbol-method');
+    // 图标：根用 home，当前节点用实心圆，其他用函数图标。
+    item.iconPath = isRoot
+      ? new vscode.ThemeIcon('home')
+      : isCurrent
+        ? new vscode.ThemeIcon('circle-filled')
+        : new vscode.ThemeIcon('symbol-method');
 
     // 点击跳转
     item.command = {
@@ -72,36 +88,38 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
       arguments: [element],
     };
 
-    // contextValue：用于右键菜单的 when 条件
-    item.contextValue = element === this.tree.currentNode ? 'currentNode' : 'node';
-    if (element === this.tree.root) item.contextValue = 'root';
+    // contextValue：根统一为 'root'，用于右键菜单 when 条件
+    // （根不允许提升为根/跳转调用位置，但允许重命名/删除）。
+    item.contextValue = isRoot ? 'root' : isCurrent ? 'currentNode' : 'node';
 
     // collapsibleState：告诉 VSCode 哪些节点可展开。
-    // 没有设置这个属性的节点不会显示展开箭头，
-    // VSCode 也不会为它们调用 getChildren → 子节点不可见。
-    // Expanded：默认展开（底部面板目标：一眼看到完整树）
+    // Expanded：默认展开（底部面板目标：一眼看到完整森林）
     item.collapsibleState =
       element.children.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None;
 
     return item;
   }
 
-  /** 获取子节点。底部面板展示全部子节点（完整树） */
+  /** 获取子节点：顶层返回所有根（森林），其余返回子节点。 */
   getChildren(element?: NavNode): NavNode[] {
-    if (!this.tree.root) return [];
     if (!element) {
-      console.log('[Backtrace] TreeView getChildren() → root');
-      return [this.tree.root];
+      return [...this.tree.roots];
     }
-    console.log(
-      `[Backtrace] TreeView getChildren(${element.symbolName || 'root'}) → ${element.children.length} children`,
-    );
     return element.children;
   }
 
-  /** 获取父节点 */
+  /** 获取父节点：根的 parent 为 null，VSCode reveal 依赖它。 */
   getParent(element: NavNode): NavNode | null {
     return element.parent;
+  }
+
+  private idOf(node: NavNode): string {
+    let id = this.nodeIds.get(node);
+    if (!id) {
+      id = `backtrace-node-${this.nextNodeId++}`;
+      this.nodeIds.set(node, id);
+    }
+    return id;
   }
 
   private shortFileName(uri: string): string {

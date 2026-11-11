@@ -135,7 +135,7 @@
       {
         "view": "backtraceStack",
         "when": "backtrace.isEmpty",
-        "contents": "No navigation history yet.\nNavigate with F12/Ctrl+Click to start tracking."
+        "contents": "No navigation history yet.\nCreate a root with Backtrace: Create Root at Cursor to anchor an exploration thread, or navigate with F12/Ctrl+Click to start from the implicit root."
       }
     ],
     "menus": {

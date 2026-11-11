@@ -59,7 +59,8 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
   getTreeItem(element: NavNode): vscode.TreeItem {
     const isCurrent = element === this.tree.currentNode;
     // 树视图：缩略信息，只显示文件名:函数名
-    const display = element.contextName || element.symbolName || '(root)';
+    // 根优先显示自定义 label；否则回退到符号上下文（与底部面板一致）。
+    const display = element.label || element.contextName || element.symbolName || '(root)';
     const item = new vscode.TreeItem(display);
 
     // description：标题右边的灰色文字，显示文件名:行号
@@ -112,9 +113,9 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
     };
 
     // contextValue：用于上下文菜单和 when 表达式
-    // 根节点设为 'root'（与底部面板一致），用于过滤掉"跳转到调用位置"
-    // 按钮——根节点没有调用者。
-    if (element === this.tree.root) {
+    // 所有根（不只是活动根）都设为 'root'，用于过滤掉"跳转到调用位置"
+    // 按钮——根节点没有调用者；判断依据是 parent 为空而不是 === tree.root。
+    if (element.parent === null) {
       item.contextValue = 'root';
     } else {
       item.contextValue = isCurrent ? 'currentNode' : 'node';
@@ -124,8 +125,10 @@ export class BacktracePathProvider implements vscode.TreeDataProvider<NavNode> {
 
   /** 获取子节点。返回从根到当前的完整线性路径作为扁平列表（无嵌套） */
   getChildren(element?: NavNode): NavNode[] {
-    if (!this.tree.root) return [];
-    // 只在顶层返回完整路径，子层级永远返回空（保证扁平列表效果）
+    if (this.tree.roots.length === 0) return [];
+    // 只在顶层返回完整路径，子层级永远返回空（保证扁平列表效果）。
+    // 注意：这里显示的是“活动根 → currentNode”的那一条路径，
+    // 切换根通过底部面板点击完成（点击后活动根会跟随）。
     if (element) return [];
     return this.pathToCurrent();
   }
@@ -202,6 +205,12 @@ export function registerJumpCommand(context: vscode.ExtensionContext, tree: NavT
   const disposable = vscode.commands.registerCommand('backtrace._jumpToNode', async (node: NavNode) => {
     if (!node) return;
     tree.currentNode = node; // 更新当前节点
+    // 多根森林：点击别的树的节点时，活动根跟随该节点所在的树，
+    // 这样侧边栏路径、reveal 和后续新增节点都会落在正确的上下文里。
+    const root = tree.rootOf(node);
+    if (root) {
+      tree.setActiveRoot(root);
+    }
     await navigateToNodeResolved(node); // 先定位后跳转
     vscode.commands.executeCommand('backtrace._treeChanged'); // 刷新 UI
   });
