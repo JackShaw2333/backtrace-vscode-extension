@@ -539,8 +539,8 @@ export class NavTree {
       callerUri: node.callerUri ?? null,
       callerLine: node.callerLine ?? null,
       callerColumn: node.callerColumn ?? null,
-      // stale 省略时就是 undefined，JSON 里直接没这个键，省空间；
-      // 读回时用 ?? false 兜底（见 deserialize）。
+      // stale 恒写 boolean（false 也写），读回时仍用 ?? false 兜底，
+      // 兼容更老数据里缺这个键的情况。
       stale: node.stale ?? false,
       // label 只有重命名过的根才有值，其余节点写 null 也行（可读性一致）。
       label: node.label ?? null,
