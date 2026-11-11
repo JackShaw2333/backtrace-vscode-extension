@@ -70,7 +70,11 @@ export async function navigateToNodeResolved(node: NavNode): Promise<void> {
   if (!node.stale) {
     node.stale = true;
     vscode.commands.executeCommand('backtrace._treeChanged');
-    console.log(`[Backtrace] marked stale → ${label} @ ${node.uri.split('/').pop()}:${node.line}`);
+    // 带上符号身份，方便排查“代码没变却被标 stale”的误判：
+    // symbolName/contextName 就是重定位用的身份证，缺失/错位一眼可见。
+    console.log(
+      `[Backtrace] marked stale → ${label} (symbol="${node.symbolName}", context="${node.contextName}") @ ${node.uri.split('/').pop()}:${node.line}`,
+    );
   }
   vscode.window.setStatusBarMessage(
     `$(warning) Backtrace: ${label} no longer found — marked stale (× to delete)`,
