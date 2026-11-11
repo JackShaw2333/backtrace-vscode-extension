@@ -139,6 +139,14 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        { "command": "backtrace.deleteNode", "when": "false" },
+        { "command": "backtrace.jumpToCaller", "when": "false" },
+        { "command": "backtrace.moveNodeUp", "when": "false" },
+        { "command": "backtrace.moveNodeDown", "when": "false" },
+        { "command": "backtrace.renameRoot", "when": "false" },
+        { "command": "backtrace.promoteNodeToRoot", "when": "false" }
+      ],
       "editor/context": [
         {
           "command": "backtrace.createRoot",
