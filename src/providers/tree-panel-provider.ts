@@ -51,7 +51,9 @@ export class BacktraceTreePanelProvider implements vscode.TreeDataProvider<NavNo
     // description: 当前节点加 ← current 后缀；根加 "root ·" 前缀；
     // 若节点记录了调用者位置，追加 "← from <父文件名>:<行号>"。
     const callerSuffix =
-      element.callerUri && element.callerLine != null ? `  ← from ${fileName}:${element.callerLine}` : '';
+      element.callerUri && element.callerLine != null
+        ? `  ← from ${this.shortFileName(element.callerUri)}:${element.callerLine}`
+        : '';
     const currentMarker = isCurrent ? '  ← current' : '';
     // stale 后缀：和侧边栏同一格式（见 path-provider.ts），纯颜色不够，
     // 色弱用户靠这段文字识别过期节点。
