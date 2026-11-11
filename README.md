@@ -14,7 +14,7 @@ Framework projects (Spring Boot, NestJS, event listeners, scheduled jobs…) hid
 ## Features
 
 - **Multiple roots (forest)** — every root is an independent exploration thread; the bottom panel lists all of them and clicking one switches the active root
-- **Create Root at Cursor** — explicitly anchor an exploration at the current symbol (great for framework entry points)
+- **Create Root at Cursor** — explicitly anchor an exploration at the current cursor position (the label comes from the enclosing symbol; great for framework entry points)
 - **Promote to Root** — detach any node together with its subtree from its parent chain and turn it into a new root (re-anchor mid-exploration)
 - **Rename Root** — root labels default to `Class#method`, but can be renamed to something human-readable such as `GET /users`
 - **Tree navigation** — each jump creates a child node; going back never destroys forward branches
@@ -23,7 +23,7 @@ Framework projects (Spring Boot, NestJS, event listeners, scheduled jobs…) hid
 - **Jump to Caller** — one click to see the exact call-site line that led to the current node
 - **Go Back / Go Forward** — keyboard-driven navigation through the tree
 - **Multi-branch forward** — when multiple forward paths exist, choose via notification or QuickPick
-- **Persistence** — forest survives VSCode restarts (workspace-scoped); v1 single-root data is migrated automatically
+- **Persistence** — forest survives VSCode restarts (workspace-scoped); stored under `backtrace.navTree.v2` with a read-only fallback to the legacy 0.2.x key; v1 single-root data is migrated automatically
 - **Position tracking** — recorded locations follow source edits live and re-resolve by symbol on jump; unresolvable nodes are greyed out as stale instead of jumping to the wrong line
 - **Delete nodes / roots** — prune uninteresting branches with the inline × button; deleting a root asks for confirmation first
 - **Reorder siblings** — use the inline ↑ / ↓ buttons in the bottom panel to reorder siblings (forward QuickPick order follows)
@@ -52,6 +52,8 @@ Backtrace normally starts a root implicitly: if the forest is empty, the first r
 
 If you already explored a bit before realizing you wanted a different anchor, select a node in the bottom panel and run **Backtrace: Promote to Root** — it keeps the node and its whole subtree, detaches it from the parent chain, and makes it a root. **Backtrace: Rename Root** gives it a readable label.
 
+Roots record the **caret position**, not the symbol declaration — put the caret exactly where you want the anchor to be. The label is still taken from the enclosing symbol (`Class#method`), so the tree stays readable.
+
 Intentionally **not** supported: re-parenting a node to an arbitrary parent, or drag-and-drop across branches. A node's parent records "where I jumped from"; rewriting it would fabricate a call path that never happened. The only structural edits are sibling reordering and promote-to-root.
 
 ## Keyboard Shortcuts
@@ -66,6 +68,20 @@ Intentionally **not** supported: re-parenting a node to an arbitrary parent, or 
 > following the usual Ctrl→Cmd platform convention without hijacking Fold.
 
 Create Root at Cursor / Promote to Root / Rename Root have no default keybindings; bind them in *Keyboard Shortcuts* if you use them often.
+
+## Commands
+
+| Command | Available from | Notes |
+|---------|----------------|-------|
+| Backtrace: Go Back / Go Forward | keybindings, Command Palette | Walk the active tree |
+| Backtrace: Create Root at Cursor | Command Palette, editor context menu | Anchors at the caret; label comes from the enclosing symbol |
+| Backtrace: Promote to Root | tree item context menu | Non-root items only |
+| Backtrace: Rename Root | root item inline action / context menu | Submitting an empty value restores the automatic label |
+| Backtrace: Delete Node | tree item inline × / context menu | Deleting a root asks for confirmation |
+| Backtrace: Jump to Caller | tree item inline action | Jumps to the exact call-site line |
+| Backtrace: Move Node Up / Down | tree item inline ↑ / ↓ | Sibling order only |
+
+Commands that need a tree node argument are hidden from the Command Palette; invoke them from the **Backtrace Tree** view instead.
 
 ## Settings
 
@@ -90,7 +106,7 @@ Create Root at Cursor / Promote to Root / Rename Root have no default keybinding
 ## Views
 
 - **Sidebar → Backtrace Stack**: the linear path from the active root to your current position
-- **Panel → Backtrace → Backtrace Tree**: the complete forest — every root and branch. Inline buttons reorder siblings (↑ / ↓), jump to the caller site, rename a root or delete a node; **Promote to Root** is available from the node's context menu
+- **Panel → Backtrace → Backtrace Tree**: the complete forest — every root and branch. Roots are marked with a home icon and a `root ·` prefix; click one to switch the active root. Inline buttons reorder siblings (↑ / ↓), jump to the caller site, rename a root or delete a node; **Promote to Root** is available from the node's context menu
 
 ## Known Limitations
 
@@ -111,6 +127,10 @@ Create Root at Cursor / Promote to Root / Rename Root have no default keybinding
   automatic label is the enclosing symbol (`Class#method`), not the HTTP route.
 - **History is workspace-scoped.** The forest is persisted per workspace and is not shared between
   windows or workspaces. Old v1 single-root data is migrated to a single root on first load.
+- **Persistence downgrade caveat.** New history is written to the `backtrace.navTree.v2` key; the
+  legacy `backtrace.navTree` key is kept read-only as a fallback. Downgrading to 0.2.x therefore
+  shows the pre-upgrade tree (not changes made after upgrading), and changes made while downgraded
+  are not merged back after re-upgrading.
 - **Depth is capped per tree.** Each root's tree stops growing at `backtrace.maxTreeDepth`
   (default 50); roots themselves are never deleted automatically.
 
