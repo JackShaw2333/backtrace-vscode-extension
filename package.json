@@ -46,6 +46,21 @@
         "command": "backtrace.moveNodeDown",
         "title": "Backtrace: Move Node Down",
         "icon": "$(arrow-down)"
+      },
+      {
+        "command": "backtrace.createRoot",
+        "title": "Backtrace: Create Root at Cursor",
+        "icon": "$(home)"
+      },
+      {
+        "command": "backtrace.renameRoot",
+        "title": "Backtrace: Rename Root",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "backtrace.promoteNodeToRoot",
+        "title": "Backtrace: Promote to Root",
+        "icon": "$(debug-start)"
       }
     ],
     "keybindings": [
@@ -124,7 +139,24 @@
       }
     ],
     "menus": {
+      "editor/context": [
+        {
+          "command": "backtrace.createRoot",
+          "when": "editorTextFocus",
+          "group": "navigation@9"
+        }
+      ],
       "view/item/context": [
+        {
+          "command": "backtrace.renameRoot",
+          "when": "view == backtraceTree && viewItem == 'root'",
+          "group": "inline@1"
+        },
+        {
+          "command": "backtrace.promoteNodeToRoot",
+          "when": "view == backtraceTree && viewItem != 'root'",
+          "group": "backtrace@1"
+        },
         {
           "command": "backtrace.moveNodeUp",
           "when": "view == backtraceTree && viewItem != 'root'",

@@ -29,6 +29,9 @@ import { registerGoForward } from './commands/go-forward';
 import { registerDeleteNode } from './commands/delete-node';
 import { registerJumpToCaller } from './commands/jump-to-caller';
 import { registerMoveNode } from './commands/move-node';
+import { registerCreateRoot } from './commands/create-root';
+import { registerRenameRoot } from './commands/rename-root';
+import { registerPromoteNode } from './commands/promote-node';
 import { BacktracePathProvider, registerJumpCommand } from './providers/path-provider';
 import { BacktraceTreePanelProvider } from './providers/tree-panel-provider';
 
@@ -126,6 +129,10 @@ export function activate(context: vscode.ExtensionContext) {
   registerJumpToCaller(context, tree);
   registerMoveNode(context, tree);
   registerJumpCommand(context, tree);
+  // 多根森林：建根 / 重命名根 / 把节点提升为根
+  registerCreateRoot(context, tree);
+  registerRenameRoot(context);
+  registerPromoteNode(context, tree);
 
   // 6. 注册侧边栏堆栈视图
   //    'backtraceStack' 必须是 package.json 中注册的视图 ID
