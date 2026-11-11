@@ -160,7 +160,7 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test": "node ./out/test/runTest.js"
+    "test": "vscode-test"
   },
   "overrides": {
     "diff": "^8.0.3",
