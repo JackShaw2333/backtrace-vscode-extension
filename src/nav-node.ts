@@ -113,6 +113,27 @@ export interface NavNode {
    *   - 旧持久化数据反序列化后无此字段 → deserialize 里用 ?? false 兜底
    */
   stale?: boolean;
+
+  /**
+   * 根节点的自定义标签（用户重命名后填写）。
+   *
+   * 为什么只在根节点上有意义？
+   *   普通节点显示“符号上下文”（contextName/symbolName）就够了；
+   *   根是“一条探索链的标题”，Spring 场景下用户可能想写成
+   *   "GET /users" 或 "订单补偿任务"，而不是方法名，所以允许覆盖。
+   * 为什么是可选的？
+   *   没改过名的根不写这个字段，UI 回退到 contextName/symbolName，
+   *   旧持久化数据反序列化后也是 undefined → 同样的回退逻辑。
+   */
+  label?: string | null;
+
+  /**
+   * 根节点来源，供 UI 区分“自动根”和“用户建的根”。
+   *   'implicit' = 森林为空时第一次被记录的跳转自动成为根（旧行为）
+   *   'manual'   = 用户通过“建根/提升为根”命令显式创建
+   * 非根节点不写这个字段。
+   */
+  kind?: 'implicit' | 'manual';
 }
 
 /**
@@ -171,19 +192,50 @@ export interface SerializedNavNode {
    * 旧数据没有这个字段 → deserialize 时用 ?? false 兜底。
    */
   stale?: boolean;
+
+  /** 根节点自定义标签（序列化版本）。详见 NavNode.label。 */
+  label?: string | null;
+
+  /** 根节点来源（序列化版本）。详见 NavNode.kind。 */
+  kind?: 'implicit' | 'manual';
 }
 
 /**
  * SerializedTree ── 序列化后的整棵树。
  *
- * 根节点总是 nodes[0]（BFS 遍历的第一个节点）。
+ * 多根森林（v2）下，根不再唯一：
+ *   - roots 存所有根在 nodes 中的下标，数组顺序 = 根的展示顺序；
+ *   - 旧数据（v1）没有 roots 字段 → deserialize 用 parentIndex === null 推导，
+ *     等价于“只有 nodes[0] 一个根”的老语义，直接兼容。
  * 为什么用数组而不是直接存根节点？
  *   数组可以顺序遍历，方便重建 parent/children 指针。
  *
- * 这个结构可以直接 JSON.stringify 保存到 VSCode 的 globalState 中。
+ * 这个结构可以直接 JSON.stringify 保存到 VSCode 的 workspaceState 中。
  */
 export interface SerializedTree {
-  /** 所有节点的扁平数组（BFS 顺序） */
+  /**
+   * 数据格式版本。
+   *   缺省 = 1（旧的单根格式，没有 roots/activeRootIndex 字段）
+   *   2      = 多根森林
+   * 为什么要版本号？读取时用它区分“旧数据迁移”和“新数据校验”，
+   * 但主判定仍以 roots 是否存在为准，兼容手工构造的旧数据。
+   */
+  version?: 1 | 2;
+
+  /**
+   * 所有根节点在 nodes 中的索引（数组顺序 = 根的展示顺序）。
+   * 旧数据没有这个字段 → deserialize 按 parentIndex === null 推导。
+   */
+  roots?: number[];
+
+  /**
+   * 活动根在 roots 中的下标。
+   * 旧数据没有 → 默认 0；deserialize 时若 currentNode 有效，优先从
+   * currentNode 的祖先链推导（以实际 current 为准，避免两者不一致）。
+   */
+  activeRootIndex?: number;
+
+  /** 所有节点的扁平数组（按“根顺序”BFS：先所有根，再逐层展开） */
   nodes: SerializedNavNode[];
 
   /**
