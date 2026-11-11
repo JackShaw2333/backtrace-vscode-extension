@@ -13,6 +13,15 @@
  *
  * 标签自动取包围符号的上下文路径（Class#method），失败回退单词/空字符串；
  * 需要人类可读标题时用“重命名根”命令覆盖（label 字段）。
+ *
+ * 位置语义：严格记录命令执行时的**光标位置**（editor.selection.active），
+ * 不做“吸附到符号声明处”。用户把光标放哪，根就锚在哪。
+ *
+ * 符号身份单独处理：symbolName/contextName 优先取光标所在的包围符号
+ * （而不是光标处的单词）。原因：光标可能停在函数上方的注释/Javadoc 行，
+ * 此时“光标处的单词”是注释里的词；若拿它当 symbolName，之后点击根做
+ * 符号重定位会找不到符号、把根本身误标成 stale。没有符号上下文时才回退
+ * 到光标单词。
  */
 
 import * as vscode from 'vscode';
@@ -33,18 +42,19 @@ export function registerCreateRoot(context: vscode.ExtensionContext, tree: NavTr
     const line = position.line + 1;
     const column = position.character + 1;
 
-    // 光标处单词（找不到时为空），用作符号名兜底。
+    // 光标处单词：只在“没有任何符号上下文”时作为符号名兜底。
     const wordRange = editor.document.getWordRangeAtPosition(position);
     const word = wordRange ? editor.document.getText(wordRange) : '';
 
-    // 复用符号上下文：根标签优先显示 contextName（Class#method）。
-    // 这里有一次语言服务查询（DocumentSymbolProvider），失败会回退到 word。
-    const nodeContext = await getNodeContext(uri, line, column, word);
-    tree.addRoot(uri, line, column, nodeContext.symbolName, nodeContext.contextName);
+    // 位置用光标；符号身份用包围符号（fallback 传空，避免注释单词
+    // 抢占真实符号名）。没有符号（纯文本/无语言服务）时回退光标单词。
+    const nodeContext = await getNodeContext(uri, line, column, '');
+    const rootSymbolName = nodeContext.symbolName === '(symbol)' && word ? word : nodeContext.symbolName;
+    tree.addRoot(uri, line, column, rootSymbolName, nodeContext.contextName);
 
     vscode.commands.executeCommand('backtrace._treeChanged');
     vscode.window.setStatusBarMessage(
-      `$(home) Backtrace: root created — ${nodeContext.contextName || nodeContext.symbolName || 'current location'}`,
+      `$(home) Backtrace: root created — ${nodeContext.contextName || rootSymbolName}`,
       4000,
     );
   });
