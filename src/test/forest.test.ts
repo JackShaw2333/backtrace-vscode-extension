@@ -350,6 +350,17 @@ suite('NavTree forest', () => {
     assert.strictEqual(tree.activeRootIndex, 1);
   });
 
+  test('rootOf terminates on a corrupted parent cycle', () => {
+    const tree = new NavTree(50);
+    const a = tree.addJump('a.ts', 1, 1, 'a');
+    const b = tree.addJump('b.ts', 2, 1, 'b');
+    // 人为制造 a ↔ b 的 parent 环（模拟损坏的持久化数据）。
+    a.parent = b;
+    b.parent = a;
+    assert.strictEqual(tree.rootOf(a), a);
+    assert.strictEqual(tree.rootOf(b), b);
+  });
+
   test('normalize re-anchors current and active root after external mutation', () => {
     const tree = new NavTree(50);
     const a = tree.addRoot('a.ts', 1, 1, 'a');

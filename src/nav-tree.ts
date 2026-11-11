@@ -92,10 +92,21 @@ export class NavTree {
     return this._roots.length === 0;
   }
 
-  /** 沿 parent 链找到 node 所属的根；node 为 null 时返回 null。 */
+  /**
+   * 沿 parent 链找到 node 所属的根；node 为 null 时返回 null。
+   *
+   * 带环路防护：持久化数据被篡改/旧 bug 产物可能让 parentIndex 成环，
+   * 裸 while 会卡死（deserialize 时尤其致命——扩展直接激活挂起）。
+   * 这里用 visited 集合兜底：重复遇到同一节点即判定成环，返回该节点。
+   */
   rootOf(node: NavNode | null): NavNode | null {
     let cur = node;
+    const seen = new Set<NavNode>();
     while (cur && cur.parent) {
+      if (seen.has(cur)) {
+        return cur;
+      }
+      seen.add(cur);
       cur = cur.parent;
     }
     return cur;
