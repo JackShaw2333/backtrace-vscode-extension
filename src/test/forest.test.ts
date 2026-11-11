@@ -51,9 +51,11 @@ suite('NavTree forest', () => {
   test('promoteToRoot detaches node and its subtree into a new root', () => {
     const tree = new NavTree(50);
     tree.addJump('a.ts', 1, 1, 'a');
-    tree.addJump('b.ts', 2, 1, 'b');
+    // 给 b 真实的调用者，才能验证 promote 后 caller* 被清空（否则是空断言）。
+    tree.addJump('b.ts', 2, 1, 'b', '', { uri: 'a.ts', line: 10, column: 1 });
     tree.addJump('c.ts', 3, 1, 'c');
     const b = tree.roots[0].children[0];
+    assert.strictEqual(b.callerUri, 'a.ts');
 
     assert.strictEqual(tree.promoteToRoot(b), true);
     assert.strictEqual(tree.roots.length, 2);
@@ -168,6 +170,24 @@ suite('NavTree forest', () => {
     assert.strictEqual(restored.currentNode?.symbolName, 'b');
     assert.strictEqual(restored.root, restored.roots[0]);
     assert.strictEqual(restored.roots[0].children[0].symbolName, 'b');
+  });
+
+  test('serialize round-trips activeRootIndex when currentNode is null', () => {
+    const tree = new NavTree(50);
+    tree.addRoot('a.ts', 1, 1, 'a');
+    const b = tree.addRoot('b.ts', 2, 1, 'b');
+    tree.setActiveRoot(b);
+    tree.currentNode = null;
+
+    const serialized = tree.serialize();
+    assert.strictEqual(serialized.currentNodeIndex, null);
+    assert.strictEqual(serialized.activeRootIndex, 1);
+
+    const restored = new NavTree(50);
+    restored.deserialize(serialized);
+    assert.strictEqual(restored.activeRootIndex, 1);
+    assert.strictEqual(restored.root, restored.roots[1]);
+    assert.strictEqual(restored.currentNode, restored.roots[1]);
   });
 
   test('deserialize migrates v1 single-root data', () => {

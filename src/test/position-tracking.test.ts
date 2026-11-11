@@ -129,6 +129,22 @@ suite('PositionTracker._applyChanges', () => {
     const tracker = new PositionTracker(tree);
     assert.strictEqual(tracker._applyChanges('a.ts', []), false);
   });
+
+  test('shifts nodes of every root, not only the active one', () => {
+    const tree = new NavTree(50);
+    tree.addRoot('a.ts', 10, 5, 'rootA');
+    const b = tree.addRoot('b.ts', 20, 3, 'rootB');
+    // 当前活动根是 b（addRoot 会切换），编辑 a.ts 不应只修活动根。
+    assert.strictEqual(tree.root, b);
+
+    const tracker = new PositionTracker(tree);
+    const moved = tracker._applyChanges('a.ts', [
+      { startLine: 0, startChar: 0, endLine: 0, endChar: 0, newText: 'x\ny\n' },
+    ]);
+    assert.strictEqual(moved, true);
+    assert.strictEqual(tree.roots[0].line, 12);
+    assert.strictEqual(tree.roots[1].line, 20);
+  });
 });
 
 suite('findSymbolPosition', () => {
