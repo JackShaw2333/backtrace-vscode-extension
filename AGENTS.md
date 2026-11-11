@@ -209,6 +209,8 @@ backtrace.goForward：
   - `refactor: xxx` — 重构
   - **语义要求**：在保留修改前后依赖语义的前提下，同一语义的修改放在同一 commit，
     不同语义的修改分开 commit（例：数据结构、持久化迁移、命令层、视图层、文档各自独立）。
+  - **语言**：commit message 与 CHANGELOG 使用英文（`type: English summary`，
+    例：`feat: support multi-root forest`）。
   - 不允许出现未 commit 的修改跨多个 session
 
 ---
