@@ -172,6 +172,23 @@ suite('findSymbolPosition', () => {
     assert.deepStrictEqual(findSymbolPosition(symbols, 'target', 'A.B', 100), { line: 30, column: 1 });
   });
 
+  test('resolves via full context path when the recorded word is an annotation name', () => {
+    // 真实回归场景：Java 定义落点 range.start 在注解行，记录到的 symbolName
+    // 是 "Override" 之类的词；contextName 仍是完整的 "Class.method"。
+    // 必须按 contextName 找回方法，否则完好的节点会被误标 stale。
+    const symbols = [sym('UserServiceImpl', 0, [sym('getUser', 9)])];
+    assert.deepStrictEqual(findSymbolPosition(symbols, 'Override', 'UserServiceImpl.getUser', 10), {
+      line: 10,
+      column: 1,
+    });
+  });
+
+  test('falls back to name search even when contextName is empty', () => {
+    // contextName 为空可能只是记录时语言服务尚未就绪；符号名仍能救回节点。
+    const symbols = [sym('UserServiceImpl', 0, [sym('getUser', 9)])];
+    assert.deepStrictEqual(findSymbolPosition(symbols, 'getUser', '', 12), { line: 10, column: 1 });
+  });
+
   test('returns null when the name is unknown or missing', () => {
     const symbols = [sym('App', 0)];
     assert.strictEqual(findSymbolPosition(symbols, 'gone', 'App', 10), null);

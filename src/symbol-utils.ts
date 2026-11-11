@@ -151,16 +151,18 @@ export async function resolveNodePosition(
 /**
  * 在符号树里按身份找位置（纯函数，不碰 VSCode API，可单测）。
  *
- * 身份 = 完整路径（contextName + '.' + symbolName），
- * 例如记录的是 contextName="App"、symbolName="ngOnInit"，
- * 就找路径恰好是 "App.ngOnInit" 的符号。
- *
  * 两阶段查找（按顺序）：
- *   1. 完整路径精确匹配。重名（函数重载）时选离 nearLine 最近的——
- *      日常编辑只造成小位移，最近的几乎一定是它。
- *   2. 兜底：context 里可能有带 '.' 的符号名（如 JS 对象字面量），
- *      按 '.' 切分路径会对不上。这时退化成"全树搜同名 + 离旧行最近"。
- *      误判代价只是偏几行，而误标 stale 会挡住跳转，所以宁可放宽。
+ *   1. 完整路径精确匹配。先按“contextName 是父路径”试
+ *      `contextName + '.' + symbolName`（如 "App" + "ngOnInit"）；
+ *      若失败且 contextName 本身是多段路径（含 '.'），再把它当作
+ *      “已包含自身的完整路径”试一次——buildContextPath 的实际产物就是
+ *      这种形状（"App.ngOnInit"），而 symbolName 不一定可靠（Java 的
+ *      定义落点 range.start 常落在注解/注释行，记录到的“词”可能是
+ *      "Override" 之类的注解名）。不试这一下，就会把完好的节点误标 stale。
+ *   2. 兜底：全树搜同名 + 离旧行最近。**不管 contextName 是否为空都要走**
+ *      这步：contexName 为空可能只是记录时语言服务还没就绪，符号名本身
+ *      仍能救回节点。误判代价只是偏几行，而误标 stale 会挡住跳转，
+ *      所以宁可放宽。
  *
  * symbolName 为空或是 '(symbol)'（记录时就没拿到词）→ 直接返回 null。
  * 防御性兜底：正常流程下外层 resolveNodePosition 会先拦下这种情况
@@ -184,20 +186,26 @@ export function findSymbolPosition(
   }
 
   // ── 第 1 阶段：完整路径精确匹配 ──
-  const wanted = contextName ? `${contextName}.${symbolName}` : symbolName;
-  const exact = collectByPath(symbols, [], wanted);
-  if (exact.length > 0) {
-    return nearest(exact, nearLine);
+  const wantedPaths: string[] = [];
+  if (contextName) {
+    // 父路径口径（旧测试/理论上更干净的记录方式）
+    wantedPaths.push(`${contextName}.${symbolName}`);
+    // 完整路径口径（buildContextPath 的实际产物：contextName 已含自身）。
+    // 只对多段路径试，避免把单段父路径（如 "App"）误当成符号本身。
+    if (contextName.includes('.')) {
+      wantedPaths.push(contextName);
+    }
+  } else {
+    wantedPaths.push(symbolName);
+  }
+  for (const wanted of wantedPaths) {
+    const exact = collectByPath(symbols, [], wanted);
+    if (exact.length > 0) {
+      return nearest(exact, nearLine);
+    }
   }
 
-  // ── 第 2 阶段：兜底，全树搜同名 ──
-  // 只有 contextName 非空（即第 1 阶段"本该"能对上却没对上）时才放宽：
-  // contextName 为空且第 1 阶段没命中，说明连顶层同名符号都没有，
-  // 再放宽也找不到，直接返回 null 即可（下面的 collect 本来就是全树搜，
-  // 为空时直接走这里，保持逻辑对称）。
-  if (!contextName) {
-    return null;
-  }
+  // ── 第 2 阶段：兜底，全树搜同名（contextName 为空也要试） ──
   const byName = collectByName(symbols, symbolName);
   if (byName.length === 0) {
     return null;
