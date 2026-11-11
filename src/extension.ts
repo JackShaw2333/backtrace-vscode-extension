@@ -189,8 +189,7 @@ export function activate(context: vscode.ExtensionContext) {
   //     为空时显示"帮助文字"引导用户使用。
   vscode.commands.executeCommand('setContext', 'backtrace.isEmpty', tree.isEmpty);
 
-  const restored =
-    config.persistHistory && tree.roots.length > 0 ? ` (${countNodes(tree.roots)} nodes restored)` : '';
+  const restored = config.persistHistory && tree.roots.length > 0 ? ` (${countNodes(tree.roots)} nodes restored)` : '';
   console.log(`[Backtrace] activated${restored}`);
 }
 

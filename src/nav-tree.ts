@@ -458,7 +458,9 @@ export class NavTree {
    */
   dump(operation: string): void {
     console.log(`[Backtrace] ═══ TREE after ${operation} ═══`);
-    console.log(`[Backtrace]   currentNode: ${this.currentNode?.contextName || this.currentNode?.symbolName || '(null)'}`);
+    console.log(
+      `[Backtrace]   currentNode: ${this.currentNode?.contextName || this.currentNode?.symbolName || '(null)'}`,
+    );
     if (this._roots.length === 0) {
       console.log('[Backtrace]   (empty)');
       console.log('[Backtrace] ════════════════');
@@ -614,7 +616,7 @@ export class NavTree {
     // currentNode：存档下标有效则用它，否则回退活动根。
     const storedCurrent =
       data.currentNodeIndex !== null && data.currentNodeIndex !== undefined
-        ? reconstructed[data.currentNodeIndex] ?? null
+        ? (reconstructed[data.currentNodeIndex] ?? null)
         : null;
     const currentRoot = this.rootOf(storedCurrent);
     const currentRootIndex = currentRoot ? this._roots.indexOf(currentRoot) : -1;
@@ -623,9 +625,7 @@ export class NavTree {
       this._activeRootIndex = currentRootIndex;
     } else {
       const storedActive =
-        data.activeRootIndex !== undefined &&
-        data.activeRootIndex >= 0 &&
-        data.activeRootIndex < this._roots.length
+        data.activeRootIndex !== undefined && data.activeRootIndex >= 0 && data.activeRootIndex < this._roots.length
           ? data.activeRootIndex
           : 0;
       this._activeRootIndex = storedActive;
