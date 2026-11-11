@@ -140,12 +140,30 @@
     ],
     "menus": {
       "commandPalette": [
-        { "command": "backtrace.deleteNode", "when": "false" },
-        { "command": "backtrace.jumpToCaller", "when": "false" },
-        { "command": "backtrace.moveNodeUp", "when": "false" },
-        { "command": "backtrace.moveNodeDown", "when": "false" },
-        { "command": "backtrace.renameRoot", "when": "false" },
-        { "command": "backtrace.promoteNodeToRoot", "when": "false" }
+        {
+          "command": "backtrace.deleteNode",
+          "when": "false"
+        },
+        {
+          "command": "backtrace.jumpToCaller",
+          "when": "false"
+        },
+        {
+          "command": "backtrace.moveNodeUp",
+          "when": "false"
+        },
+        {
+          "command": "backtrace.moveNodeDown",
+          "when": "false"
+        },
+        {
+          "command": "backtrace.renameRoot",
+          "when": "false"
+        },
+        {
+          "command": "backtrace.promoteNodeToRoot",
+          "when": "false"
+        }
       ],
       "editor/context": [
         {
@@ -210,11 +228,11 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/vscode": "^1.82.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.9.2",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
     "eslint": "^9.39.3",
-    "mocha": "^10.2.0",
+    "mocha": "^11.8.0",
     "prettier": "^3.9.5",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"
