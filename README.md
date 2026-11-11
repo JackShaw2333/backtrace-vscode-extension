@@ -152,7 +152,7 @@ Press `F5` in VSCode to launch an Extension Development Host with the extension 
 | `npm run watch` | Incremental build |
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |
-| `npm test` | Run the Mocha suite in an Extension Host (`vscode-test`, pinned VS Code 1.90) |
+| `npm test` | Run the Mocha suite in an Extension Host (`vscode-test`, current VS Code release) |
 
 Please run `npm run compile`, `npm run lint` and `npm test` before opening a PR.
 

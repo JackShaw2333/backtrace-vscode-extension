@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+- Maintenance: upgraded the development toolchain (`@vscode/test-cli` 0.0.15, `@vscode/test-electron` 3.1.0, `@vscode/vsce` 4.1.0, Mocha 11.8). `npm test` now runs the suite in the **current** VS Code release instead of a pinned 1.90 host; the macOS executable-name issue with older `@vscode/test-electron` versions is gone
+- Packaging: the test harness config (`.vscode-test.mjs`) and the `.vscode-test/` cache are excluded from the VSIX
+- No extension runtime changes. The published extension still has zero third-party runtime dependencies, and the open Dependabot alerts are all development-scope — none of those packages ship to users
+
 ## 0.3.1
 
 - Multi-root forest: navigation history is now a set of independent exploration trees. The bottom panel lists every root, clicking a root or node switches the active root, and the sidebar shows the path from the active root to the current node

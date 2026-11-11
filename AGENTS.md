@@ -2,7 +2,7 @@
 
 VSCode 扩展：用**树形导航**替代 VSCode 原生线性堆栈导航历史，仅记录有意义的导航跳转（F12/Ctrl+Click 等），支持后退/前进、侧边栏路径、底部森林面板、持久化；多根森林让框架类项目可以显式标注探索起点。
 
-> **当前状态：v0.3.1** — 所有模块通过 tsc 编译 + eslint 检查 + 87 项 mocha 单测（`vscode-test`，Extension Host，VS Code 1.90）。
+> **当前状态：v0.3.2** — 所有模块通过 tsc 编译 + eslint 检查 + 87 项 mocha 单测（`vscode-test`，Extension Host，当前 VS Code 稳定版）。
 
 ---
 
@@ -25,7 +25,7 @@ VSCode 扩展：用**树形导航**替代 VSCode 原生线性堆栈导航历史�
 | `npm run watch` | 监听模式编译 |
 | `npm run lint` | eslint 检查（flat config） |
 | `npm run format` | Prettier 格式化 src/ |
-| `npm test` | 在 Extension Host 跑 Mocha 测试（vscode-test，固定 VS Code 1.90） |
+| `npm test` | 在 Extension Host 跑 Mocha 测试（vscode-test，当前 VS Code 稳定版） |
 | `F5`（VSCode） | 启动 Extension Development Host 调试 |
 
 ---
