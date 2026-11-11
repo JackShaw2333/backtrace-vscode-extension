@@ -254,6 +254,7 @@ export class NavTree {
     if (!this.currentNode || !this.isAncestorOrSelf(node, this.currentNode)) {
       this.currentNode = node;
     }
+    this.normalize();
     this.dump('promoteToRoot');
     return true;
   }
@@ -364,10 +365,20 @@ export class NavTree {
         this.dump('removeNode');
         return;
       }
-      this._activeRootIndex = Math.min(rootIndex, this._roots.length - 1);
-      if (this.currentNode && this.isAncestorOrSelf(target, this.currentNode)) {
-        this.currentNode = this._roots[this._activeRootIndex] ?? this._roots[0] ?? null;
+      // 活动根下标修正：删的根在活动根之前 → 下标左移；删的就是
+      // 活动根 → 取滑入该位置的根（越界取最后一个）；删的在后面则不动。
+      // 不能无条件 Math.min(rootIndex, …)：那只在“删活动根”时恰好成立。
+      if (rootIndex < this._activeRootIndex) {
+        this._activeRootIndex--;
+      } else if (rootIndex === this._activeRootIndex) {
+        this._activeRootIndex = Math.min(rootIndex, this._roots.length - 1);
       }
+      // current 在删除的树里 → 置空，交给 normalize 回退到修正后的活动根；
+      // 不在树里时 normalize 会按 current 自身的根重新校准活动根。
+      if (this.currentNode && this.isAncestorOrSelf(target, this.currentNode)) {
+        this.currentNode = null;
+      }
+      this.normalize();
       this.dump('removeNode');
       return;
     }
@@ -381,11 +392,11 @@ export class NavTree {
     while (node) {
       if (node === target) {
         this.currentNode = target.parent;
-        this.dump('removeNode');
-        return;
+        break;
       }
       node = node.parent;
     }
+    this.normalize();
     this.dump('removeNode');
   }
 
@@ -631,5 +642,8 @@ export class NavTree {
       this._activeRootIndex = storedActive;
       this.currentNode = this._roots[this._activeRootIndex] ?? this._roots[0] ?? null;
     }
+    // 反序列化后统一收敛一次：数据被手工篡改/旧 bug 产物导致
+    // current 与 roots 不一致时，以 current 实际所在的根为准。
+    this.normalize();
   }
 }

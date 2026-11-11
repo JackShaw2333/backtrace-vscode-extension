@@ -304,4 +304,60 @@ suite('NavTree forest', () => {
     assert.strictEqual(tree.roots[1], r2);
     assert.strictEqual(r2.children.length, 1);
   });
+
+  test('removing a root after the active root keeps the active root invariant', () => {
+    const tree = new NavTree(50);
+    const a = tree.addRoot('a.ts', 1, 1, 'a');
+    tree.addRoot('b.ts', 2, 1, 'b');
+    tree.addRoot('c.ts', 3, 1, 'c');
+    tree.setActiveRoot(a);
+    tree.currentNode = a;
+
+    tree.removeNode(tree.roots[1]); // 删 b（在活动根之后）
+    assert.strictEqual(tree.roots.length, 2);
+    assert.strictEqual(tree.root, a);
+    assert.strictEqual(tree.currentNode, a);
+    assert.strictEqual(tree.activeRootIndex, 0);
+    assert.strictEqual(tree.rootOf(tree.currentNode!), tree.root);
+  });
+
+  test('removing the active root falls back to a surviving root', () => {
+    const tree = new NavTree(50);
+    tree.addRoot('a.ts', 1, 1, 'a');
+    const b = tree.addRoot('b.ts', 2, 1, 'b');
+    tree.addRoot('c.ts', 3, 1, 'c');
+    assert.strictEqual(tree.setActiveRoot(b), true);
+    tree.currentNode = b;
+
+    tree.removeNode(b);
+    assert.strictEqual(tree.roots.length, 2);
+    assert.strictEqual(tree.currentNode, tree.root);
+    assert.strictEqual(tree.rootOf(tree.currentNode!), tree.root);
+  });
+
+  test('removing an earlier root keeps the active root on the same tree', () => {
+    const tree = new NavTree(50);
+    const a = tree.addRoot('a.ts', 1, 1, 'a');
+    tree.addRoot('b.ts', 2, 1, 'b');
+    const c = tree.addRoot('c.ts', 3, 1, 'c');
+    tree.setActiveRoot(c);
+    tree.currentNode = c;
+
+    tree.removeNode(a); // 删第一个根（在活动根之前）
+    assert.strictEqual(tree.roots.length, 2);
+    assert.strictEqual(tree.root, c);
+    assert.strictEqual(tree.currentNode, c);
+    assert.strictEqual(tree.activeRootIndex, 1);
+  });
+
+  test('normalize re-anchors current and active root after external mutation', () => {
+    const tree = new NavTree(50);
+    const a = tree.addRoot('a.ts', 1, 1, 'a');
+    tree.addRoot('b.ts', 2, 1, 'b');
+    tree.setActiveRoot(a);
+    tree.currentNode = null;
+    tree.normalize();
+    assert.strictEqual(tree.currentNode, a);
+    assert.strictEqual(tree.root, a);
+  });
 });
