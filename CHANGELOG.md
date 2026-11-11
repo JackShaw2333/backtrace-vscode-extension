@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0
+
+- Multi-root forest: navigation history is now a set of independent exploration trees; the bottom panel lists every root and clicking one switches the active root
+- New "Create Root at Cursor": explicitly anchor an exploration at a framework entry (controller method, @Scheduled / event listener, main, or test method); subsequent F12 jumps attach under that root
+- New "Promote to Root": detach a node and its whole subtree from its parent chain into a standalone root (re-anchor mid-exploration)
+- New "Rename Root": root labels default to Class#method and can be renamed to human-readable titles such as GET /users
+- Deleting a root now asks for modal confirmation (the whole subtree is removed as well); roots are marked with a home icon and a "root ·" prefix in the panel
+- Persistence upgraded to v2: new `backtrace.navTree.v2` key with read-only fallback to the legacy key, so downgrading never loses other roots; v1 single-root data is migrated automatically
+- Fix: depth pruning now falls back to the parent when it removes the current node, preventing detached nodes and a lost `currentNodeIndex` on serialization
+- Test harness: repaired `npm test` (vscode-test with VS Code 1.90 pinned, working around the Electron/Code executable rename in newer macOS builds of `@vscode/test-electron`)
+- Intentionally no re-parenting/drag-and-drop: parent links record exploration order, and rewriting them would fabricate a call path; structural edits are limited to sibling reordering and promote-to-root
+
 ## 0.2.0
 
 - Reorder siblings with the inline ↑ / ↓ buttons in the bottom panel (forward QuickPick order follows the new order)
