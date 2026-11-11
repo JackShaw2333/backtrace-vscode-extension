@@ -1,4 +1,6 @@
 .vscode/**
+.vscode-test.mjs
+.vscode-test/**
 .gitignore
 AGENTS.md
 eslint.config.mjs
